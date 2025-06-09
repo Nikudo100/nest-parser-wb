@@ -5,116 +5,133 @@ import * as fs from 'fs';
 import * as path from 'path';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
+import { WBProduct } from './dto/WBProduct';
+import { Product } from '@prisma/client';
+
 
 @Injectable()
 export class ParserService {
   private readonly logger = new Logger(ParserService.name);
   private readonly storagePath = path.resolve(__dirname, 'storage');
+  prisma: any;
 
-  constructor(private readonly httpService: HttpService) {
-    this.ensureStorageDir();
-  }
+  constructor(private readonly httpService: HttpService) {}
 
-  private ensureStorageDir() {
-    if (!fs.existsSync(this.storagePath)) {
-      fs.mkdirSync(this.storagePath, { recursive: true });
-    }
-  }
-
-  async getCardData(productId: number) {
-    const url = `https://card.wb.ru/cards/v1/detail?nm=${productId}`;
-    try {
-      const response = await firstValueFrom(this.httpService.get(url));
-      const product = response.data?.data?.products?.[0];
-      if (!product) {
-        this.logger.warn(`card.json не содержит товар ${productId}`);
-        return null;
-      }
-      return {
-        fullCardJson: response.data,
-        product,
-      };
-    } catch (error) {
-      this.logger.error(`Ошибка при получении card.json для ${productId}: ${error.message}`);
-      return null;
-    }
-  }
-
-  async getDetailData(productId: number) {
-    const idStr = productId.toString().padStart(10, '0');
-    const vol = idStr.slice(0, 3);
-    const part = idStr.slice(3, 5);
-    const url = `https://basket-${vol}.wb.ru/vol${vol}/part${part}/${idStr}/detail.json`;
+  async fetchProductCard(nmId: number): Promise<WBProduct> {
+    const url = `https://card.wb.ru/cards/v2/detail?appType=1&curr=rub&dest=-1257786&spp=30&hide_dtype=13&ab_testing=true&lang=ru&nm=${nmId}`;
 
     try {
-      const response = await firstValueFrom(this.httpService.get(url));
-      return response.data;
-    } catch (error) {
-      this.logger.error(`Ошибка при получении detail.json для ${productId}: ${error.message}`);
-      return null;
-    }
-  }
-
-  async fetchAndSaveAllJson(productId: number) {
-    const cardResult = await this.getCardData(productId);
-    const detailJson = await this.getDetailData(productId);
-
-    if (!cardResult) {
-      this.logger.warn(`Не удалось получить card.json для ${productId}`);
-      return;
-    }
-
-    const fullData = {
-      productId,
-      card: cardResult.fullCardJson,
-      detail: detailJson,
-    };
-
-    const filePath = path.join(this.storagePath, `${productId}.json`);
-
-    fs.writeFileSync(filePath, JSON.stringify(fullData, null, 2), 'utf-8');
-    this.logger.log(`JSON успешно сохранён: ${filePath}`);
-    console.log(fullData);
-  }
-
-
-
-  async parseProduct(url: string) {
-    try {
-      // 1. Получаем HTML страницы
-      const { data: html } = await axios.get(url, {
-        headers: {
-          // Нужно установить user-agent, чтобы сервер не блокировал
-          'User-Agent': 'Mozilla/5.0 (compatible; NestJS bot)',
-        },
+      const response = await axios.get(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0' },
       });
 
-      // 2. Загружаем HTML в cheerio
-      const $ = cheerio.load(html);
+      const product = response.data?.data?.products?.[0];
 
-      // 3. Выделяем нужные данные (пример)
-      const productName = $('h1.product-title').text().trim();
-      const price = $('.price-block__final-price').text().trim();
-      const description = $('.product-description').text().trim();
+      if (!product) {
+        throw new Error('Товар не найден');
+      }
 
-      // Возвращаем объект с данными
-      return {
-        productName,
-        price,
-        description,
-      };
+      return product;
     } catch (error) {
-      throw new HttpException('Ошибка парсинга страницы', HttpStatus.BAD_REQUEST);
+      throw new Error(`Ошибка при получении товара: ${error.message}`);
     }
   }
+
+  async saveProductToDB(product: WBProduct, isOurProduct = false): Promise<Product> {
+    const {
+      id,
+      name,
+      brand,
+      supplier,
+      supplierId,
+      supplierRating,
+      rating,
+      reviewRating,
+      feedbacks,
+      totalQuantity,
+      colors,
+      sizes,
+    } = product;
+
+    const price = sizes?.[0]?.price?.total
+      ? Math.round(sizes[0].price.total / 100)
+      : null;
+
+    const savedProduct = await this.prisma.product.upsert({
+      where: { nmid: id },
+      create: {
+        nmid: id,
+        name,
+        brand,
+        supplier,
+        supplierId,
+        supplierRating,
+        rating,
+        reviewRating,
+        feedbacks,
+        totalQuantity,
+        price,
+        colors,
+        is_our_product: isOurProduct,
+      },
+      update: {
+        name,
+        brand,
+        supplier,
+        supplierId,
+        supplierRating,
+        rating,
+        reviewRating,
+        feedbacks,
+        totalQuantity,
+        price,
+        colors,
+        is_our_product: isOurProduct,
+        parsedAt: new Date(),
+      },
+    });
+  
+    // Очистка старых остатков
+    await this.prisma.warehouseStock.deleteMany({
+      where: { productId: savedProduct.id },
+    });
+  
+    // Новые остатки
+    const stockEntries = sizes.flatMap((size) =>
+      size.stocks.map((stock) => ({
+        wh: stock.wh,
+        dtype: stock.dtype,
+        dist: stock.dist,
+        qty: stock.qty,
+        priority: stock.priority,
+        time1: stock.time1,
+        time2: stock.time2,
+        sizeName: size.name || '',
+        sizeRank: size.rank,
+        optionId: BigInt(size.optionId),
+        productId: savedProduct.id,
+      }))
+    );
+
+    if (stockEntries.length) {
+      await this.prisma.warehouseStock.createMany({ data: stockEntries });
+    }
+
+    return savedProduct;
+  }
+
+  async processProductCard(nmId: number, isOurProduct = false) {
+    const product = await this.fetchProductCard(nmId);
+    return this.saveProductToDB(product, isOurProduct);
+  }
+
   async getProductCard(nmId: number) {
-    const url = `https://card.wb.ru/cards/detail?appType=1&curr=rub&dest=-1257786&nm=${nmId}`;
-    // const url = `https://card.wb.ru/cards/detail?appType=1&curr=rub&dest=-1257786&spp=30&nm=${nmId}`;
+    const url = `https://card.wb.ru/cards/v2/detail?appType=1&curr=rub&dest=-1257786&spp=30&hide_dtype=13&ab_testing=true&lang=ru&nm=${nmId}`;
 
     try {
       const response = await axios.get(url, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (NestJS Parser)',
+          'User-Agent': 'Mozilla/5.0',
         },
       });
 
@@ -140,7 +157,7 @@ export class ParserService {
     }
   }
 
-    test() {
-    return 'test';
+  test() {
+    return 'test 123 1';
   }
 }
