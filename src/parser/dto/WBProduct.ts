@@ -3,6 +3,7 @@ export type WBProduct = {
     name?: string;
     brand?: string;
     supplier?: string;
+    pics?:any;
     supplierId?: number;
     supplierRating?: number;
     rating?: number;
