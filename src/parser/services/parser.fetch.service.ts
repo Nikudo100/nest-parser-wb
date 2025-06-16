@@ -31,4 +31,7 @@ export class ParserFetchService {
             throw new Error(`Ошибка при получении товара: ${error.message}`);
         }
     }
+
+
+    
 }

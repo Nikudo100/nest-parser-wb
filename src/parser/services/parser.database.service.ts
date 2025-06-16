@@ -3,12 +3,19 @@ import { Product } from '@prisma/client';
 import { WBProduct } from '../dto/WBProduct';
 
 import { allOurProductsNmid } from '../storage/allOurProductsNmid';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
 export class ParserDatabaseService {
-    prisma: any;
+  constructor(private prisma: PrismaService) {}
 
   async saveProductToDB(product: WBProduct): Promise<Product> {
+    const savedProduct = await this.saveBasicProductInfo(product);
+    await this.processWarehouseAndStockData(savedProduct, product.sizes);
+    return savedProduct;
+  }
+
+  private async saveBasicProductInfo(product: WBProduct): Promise<Product> {
     const {
       id,
       name,
@@ -37,7 +44,7 @@ export class ParserDatabaseService {
     const isOurProduct = allOurProductsNmid.includes(id.toString());
 
     // Save or update product with image
-    const savedProduct = await this.prisma.product.upsert({
+    return await this.prisma.product.upsert({
       where: { nmid: id },
       create: {
         nmid: id,
@@ -72,8 +79,9 @@ export class ParserDatabaseService {
         parsedAt: new Date(),
       },
     });
+  }
 
-    // Process warehouse stocks in transaction
+  private async processWarehouseAndStockData(savedProduct: Product, sizes: WBProduct['sizes']): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       // Clean old warehouse stocks
       await tx.warehouseStock.deleteMany({
@@ -101,29 +109,34 @@ export class ParserDatabaseService {
         await tx.warehouseStock.createMany({ data: stockEntries });
       }
 
-      // Calculate and save daily stock snapshot
-      const totalStock = stockEntries.reduce((sum, entry) => sum + entry.qty, 0);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      await tx.dailyStockSnapshot.upsert({
-        where: {
-          productId_date: {
-            productId: savedProduct.id,
-            date: today,
-          },
-        },
-        create: {
-          productId: savedProduct.id,
-          date: today,
-          totalStock,
-        },
-        update: {
-          totalStock,
-        },
-      });
+      await this.saveDailyStockSnapshot(tx, savedProduct.id, stockEntries);
     });
-
-    return savedProduct;
   }
-}
+
+  private async saveDailyStockSnapshot(
+    tx: any,
+    productId: number,
+    stockEntries: Array<{ qty: number }>,
+  ): Promise<void> {
+    const totalStock = stockEntries.reduce((sum, entry) => sum + entry.qty, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    await tx.dailyStockSnapshot.upsert({
+      where: {
+        productId_date: {
+          productId: productId,
+          date: today,
+        },
+      },
+      create: {
+        productId: productId,
+        date: today,
+        totalStock,
+      },
+      update: {
+        totalStock,
+      },
+    });
+  }
+} 

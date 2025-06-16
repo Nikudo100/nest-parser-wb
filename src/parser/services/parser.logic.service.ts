@@ -50,7 +50,21 @@ export class ParserLogicService {
       }
     }
   }
-  
+
+  async buildWbCardUrl(nmId: number): Promise<string> {
+    const vol = Math.floor(nmId / 1000);
+    const part = vol;
+    const host = Math.floor((nmId % 100) / 10)
+      .toString()
+      .padStart(2, '0');
+    return `https://basket-${host}.wbbasket.ru/vol${Math.floor(vol / 100)}/part${part}/${nmId}/info/ru/card.json`;
+  }
+
+  async findCardUrl(nmId: number){
+    const url = this.buildWbCardUrl(nmId)
+
+  }
+
   test() {
     return 'test 123 1';
   }
