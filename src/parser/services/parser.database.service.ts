@@ -1,4 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { instanceToPlain, plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 import { Product } from '@prisma/client';
 import { WBProduct } from '../dto/WBProduct';
 
@@ -154,16 +156,41 @@ export class ParserDatabaseService
     }
   }
 
-  public async saveCartJson(nmId: number, cardData: ProductCard): Promise<void> {
+  public async saveCartJson(nmId: number, rawData: any): Promise<void> {
+    const productCard = plainToInstance(ProductCard, rawData);
 
-    const nmIdToNum =  Number(nmId)
-    const createData = {...cardData, nmId: nmIdToNum}
-    const updateData = {...cardData, imtId: Number(cardData.imtId),parsedAt: new Date()}
+    const errors = await validate(productCard);
+    if (errors.length > 0) {
+      console.error('Validation failed', errors);
+      throw new Error('ProductCard validation failed');
+    }
+
+    const nmIdToNum = Number(nmId);
+
+    // ✅ Преобразуем instance в plain-объект
+    const plainCard = instanceToPlain(productCard) as any;
+
+    const processedCard = {
+      ...plainCard,
+      nmId: nmIdToNum,
+      imtId: Number(plainCard.imtId),
+      parsedAt: new Date(),
+      
+      // ✅ Сериализуем JSON-поля (если они в Prisma определены как `Json`)
+      options: JSON.stringify(plainCard.options),
+      groupedOptions: JSON.stringify(plainCard.groupedOptions),
+      colors: JSON.stringify(plainCard.colors),
+      fullColors: JSON.stringify(plainCard.fullColors),
+      data: JSON.stringify(plainCard.data),
+      certificate: JSON.stringify(plainCard.certificate),
+      selling: JSON.stringify(plainCard.selling),
+      media: JSON.stringify(plainCard.media),
+    };
 
     await this.prisma.productCart.upsert({
       where: { nmId: nmIdToNum },
-      create: createData,
-      update: updateData
+      create: processedCard,
+      update: processedCard
     });
   }
 
