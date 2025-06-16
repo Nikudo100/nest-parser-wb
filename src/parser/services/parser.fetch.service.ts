@@ -1,9 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { WBProduct } from '../dto/WBProduct';
 import axios from 'axios';
 
 @Injectable()
 export class ParserFetchService {
+    private readonly logger = new Logger(ParserFetchService.name);
 
     async fetchJson(url: string) {
         try {
@@ -16,7 +17,7 @@ export class ParserFetchService {
         }
     }
 
-    async fetchProductCard(nmId: number): Promise<WBProduct> {
+    async fetchProduct(nmId: number): Promise<WBProduct> {
         const url = `https://card.wb.ru/cards/v2/detail?appType=1&curr=rub&dest=-1257786&spp=30&hide_dtype=13&ab_testing=true&lang=ru&nm=${nmId}`;
         try {
             const data = await this.fetchJson(url);
@@ -33,5 +34,27 @@ export class ParserFetchService {
     }
 
 
-    
+    async fetchProductCardJson(nmId: number): Promise<any> {
+        const vol = Math.floor(nmId / 100000);
+        const part = Math.floor(nmId / 1000);
+        for (let i = 1; i <= 99; i++) {
+          const subdomain = i.toString().padStart(2, '0');
+          const url = `https://basket-${subdomain}.wbbasket.ru/vol${vol}/part${part}/${nmId}/info/ru/card.json`;
+
+          try {
+            const data = await this.fetchJson(url);
+            this.logger.log(`Successfully fetched data from URL: ${url}`);
+            return data;
+          } catch (error) {
+            if (!error.message.includes('404')) {
+              this.logger.error(`Error fetching from URL: ${url}. Error: ${error.message}`);
+              throw new Error(`Ошибка при получении card.json: ${error.message}`);
+            }
+            this.logger.warn(`404 Not Found for URL: ${url}`);
+            // Иначе продолжаем цикл
+          }
+        }
+
+        throw new Error(`card.json не найден ни на одном из поддоменов для nmId=${nmId}`);
+      }
 }

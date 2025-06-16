@@ -16,10 +16,16 @@ export class ParserController {
     return this.ParserLogicService.runSimilarProductsParser();
   }
 
-  @Get('alg2')
-  async runAlg2() {
-    return this.ParserLogicService.runSimilarProductsParser();
+  // @Get('alg2')
+  // async runAlg2() {
+  //   return this.ParserLogicService.runSimilarProductsParser();
+  // }
+  @Get('card')
+  async runCardJsonParser() {
+    return this.ParserLogicService.runCardJsonParser();
   }
+
+
 
   @Get('test')
   async test() {

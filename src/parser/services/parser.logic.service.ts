@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ParserFetchService } from './parser.fetch.service';
 import { ParserDatabaseService } from './parser.database.service';
 import { allOurProductsNmid } from '../storage/allOurProductsNmid';
+import { allOurProductsNmidTEST } from '../storage/allOurProductsNmidTEST';
 
 @Injectable()
 export class ParserLogicService {
@@ -13,28 +14,12 @@ export class ParserLogicService {
   ) {}
 
   /**
-   * Алгоритм 1: Получение всех категорий, к которым привязаны товары нашего бренда
-   */
-  async runBrandCategoryParser(brandId: number): Promise<void> {
-    try {
-      this.logger.log(`Запуск алгоритма 1: парсинг категорий бренда ${brandId}`);
-
-      // Пример URL: https://www.wildberries.ru/brands/312106698-stikdesign
-      // Нужно найти способ получить список категорий через API или спарсить страницу (можно добавить Puppeteer)
-
-      // TODO: Реализация получения категорий по ID бренда
-    } catch (err) {
-      this.logger.error('Ошибка в runBrandCategoryParser:', err);
-    }
-  }
-
-  /**
    * Алгоритм 2: Получение похожих товаров по каждому нашему товару
    */
   async runSimilarProductsParser(): Promise<void> {
     this.logger.log('Запуск алгоритма 2: парсинг похожих товаров');
 
-    for (const nmid of allOurProductsNmid) {
+    for (const nmid of allOurProductsNmidTEST) {
       try {
         const url = `https://recom.wb.ru/visual/ru/common/v5/search?appType=1&curr=rub&dest=-1257786&hide_dtype=13&lang=ru&page=1&query=${nmid}&resultset=catalog&spp=30&suppressSpellcheck=false`;
         const data = await this.fetchService.fetchJson(url);
@@ -42,8 +27,8 @@ export class ParserLogicService {
         const similarProducts = data?.data?.products || [];
 
         for (const item of similarProducts) {
-          const product = await this.fetchService.fetchProductCard(item.id);
-          await this.dbService.saveProductToDB(product);
+          const product = await this.fetchService.fetchProduct(Number(item.id));
+          this.logger.log(await this.dbService.saveProductToDB(product));
         }
       } catch (err) {
         this.logger.warn(`Ошибка при обработке NMID=${nmid}: ${err.message}`);
@@ -51,19 +36,21 @@ export class ParserLogicService {
     }
   }
 
-  async buildWbCardUrl(nmId: number): Promise<string> {
-    const vol = Math.floor(nmId / 1000);
-    const part = vol;
-    const host = Math.floor((nmId % 100) / 10)
-      .toString()
-      .padStart(2, '0');
-    return `https://basket-${host}.wbbasket.ru/vol${Math.floor(vol / 100)}/part${part}/${nmId}/info/ru/card.json`;
+  async runCardJsonParser(): Promise<void> {
+    this.logger.log('Запуск получения card.json для всех товаров');
+
+    for (const nmid of allOurProductsNmidTEST) {
+      try {
+        const cardData = await this.fetchService.fetchProductCardJson(Number(nmid));
+        this.logger.log(`Получен card.json для NMID=${nmid}: ${cardData?.imt_name || 'без имени'}`);
+
+        this.dbService.saveCartJson(Number(nmid), cardData)
+      } catch (err) {
+        this.logger.warn(`Не удалось получить card.json для NMID=${nmid}: ${err.message}`);
+      }
+    }
   }
 
-  async findCardUrl(nmId: number){
-    const url = this.buildWbCardUrl(nmId)
-
-  }
 
   test() {
     return 'test 123 1';

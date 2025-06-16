@@ -1,116 +1,123 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Product } from '@prisma/client';
 import { WBProduct } from '../dto/WBProduct';
 
 import { allOurProductsNmid } from '../storage/allOurProductsNmid';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { ProductCard } from '../dto/ProductCard';
 
 @Injectable()
-export class ParserDatabaseService {
+export class ParserDatabaseService 
+{
   constructor(private prisma: PrismaService) {}
 
-  async saveProductToDB(product: WBProduct): Promise<Product> {
-    const savedProduct = await this.saveBasicProductInfo(product);
-    await this.processWarehouseAndStockData(savedProduct, product.sizes);
-    return savedProduct;
+  private readonly logger = new Logger(ParserDatabaseService.name);
+
+  public async saveProductToDB(product: WBProduct): Promise<Product> {
+    try {
+      const savedProduct = await this.saveBasicProductInfo(product);
+      await this.processWarehouseAndStockData(savedProduct, product.sizes);
+      return savedProduct;
+    } catch (error) {
+      this.logger.error(`Failed to save product to DB: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   private async saveBasicProductInfo(product: WBProduct): Promise<Product> {
-    const {
-      id,
-      name,
-      brand,
-      pics,
-      supplier,
-      supplierId,
-      supplierRating,
-      rating,
-      reviewRating,
-      feedbacks,
-      totalQuantity,
-      colors,
-      sizes,
-    } = product;
+    try {
+      const id = Number(product.id);
+      const isOurProduct = allOurProductsNmid.includes(id.toString());
 
-    const price = sizes?.[0]?.price?.total
-      ? Math.round(sizes[0].price.total / 100)
-      : null;
+      const sizes = product.sizes;
+      const price = sizes?.[0]?.price?.total
+        ? Math.round(sizes[0].price.total / 100)
+        : null;
 
-    // Get main product image URL
-    const image = pics && pics.length > 0 
-      ? `https://images.wbstatic.net/big/new/${Math.floor(id/10000)}0000/${id}-1.jpg`
-      : null;
+      const image =
+        product.pics && product.pics.length > 0
+          ? `https://images.wbstatic.net/big/new/${Math.floor(id / 10000)}0000/${id}-1.jpg`
+          : null;
 
-    const isOurProduct = allOurProductsNmid.includes(id.toString());
-
-    // Save or update product with image
-    return await this.prisma.product.upsert({
-      where: { nmid: id },
-      create: {
-        nmid: id,
-        name,
-        brand,
-        image,
-        supplier,
-        supplierId,
-        supplierRating,
-        rating,
-        reviewRating,
-        feedbacks,
-        totalQuantity,
-        price,
-        colors,
+      const baseData = {
+        nmId: id,
+        imtId: Number(product.root),
+        name: product.name,
+        brand: product.brand,
+        supplier: product.supplier,
+        supplierId: product.supplierId,
+        supplierRating: product.supplierRating,
+        rating: product.rating,
+        reviewRating: product.reviewRating,
+        feedbacks: product.feedbacks,
+        totalQuantity: product.totalQuantity,
+        colors: product.colors,
         is_our_product: isOurProduct,
-      },
-      update: {
-        name,
-        brand,
         image,
-        supplier,
-        supplierId,
-        supplierRating,
-        rating,
-        reviewRating,
-        feedbacks,
-        totalQuantity,
         price,
-        colors,
-        is_our_product: isOurProduct,
-        parsedAt: new Date(),
-      },
-    });
+      };
+
+      const result = await this.prisma.product.upsert({
+        where: { nmId: id },
+        create: {
+          ...baseData,
+        },
+        update: {
+          ...baseData,
+          parsedAt: new Date(),
+        },
+      });
+
+      this.logger.debug(`Successfully saved basic product info for nmId: ${id}`);
+      return result;
+
+    } catch (error) {
+      this.logger.error(`Failed to save basic product info: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   private async processWarehouseAndStockData(savedProduct: Product, sizes: WBProduct['sizes']): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
-      // Clean old warehouse stocks
-      await tx.warehouseStock.deleteMany({
-        where: { productId: savedProduct.id },
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        try {
+          // Clean old warehouse stocks
+          await tx.warehouseStock.deleteMany({
+            where: { productId: savedProduct.id },
+          });
+
+          // Prepare and save new warehouse stocks
+          const stockEntries = sizes.flatMap((size) =>
+            size.stocks.map((stock) => ({
+              wh: stock.wh,
+              dtype: stock.dtype,
+              dist: stock.dist,
+              qty: stock.qty,
+              priority: stock.priority,
+              time1: stock.time1,
+              time2: stock.time2,
+              sizeName: size.name || '',
+              sizeRank: size.rank,
+              optionId: Number(size.optionId),
+              productId: savedProduct.id,
+            }))
+          );
+
+          if (stockEntries.length) {
+            await tx.warehouseStock.createMany({ data: stockEntries });
+            this.logger.debug(`Created ${stockEntries.length} warehouse stock entries for product ${savedProduct.id}`);
+          }
+
+          await this.saveDailyStockSnapshot(tx, savedProduct.id, stockEntries);
+        } catch (error) {
+          this.logger.error(`Transaction failed: ${error.message}`, error.stack);
+          throw error;
+        }
       });
-
-      // Prepare and save new warehouse stocks
-      const stockEntries = sizes.flatMap((size) =>
-        size.stocks.map((stock) => ({
-          wh: stock.wh,
-          dtype: stock.dtype,
-          dist: stock.dist,
-          qty: stock.qty,
-          priority: stock.priority,
-          time1: stock.time1,
-          time2: stock.time2,
-          sizeName: size.name || '',
-          sizeRank: size.rank,
-          optionId: BigInt(size.optionId.toString()),
-          productId: savedProduct.id,
-        }))
-      );
-
-      if (stockEntries.length) {
-        await tx.warehouseStock.createMany({ data: stockEntries });
-      }
-
-      await this.saveDailyStockSnapshot(tx, savedProduct.id, stockEntries);
-    });
+    } catch (error) {
+      this.logger.error(`Failed to process warehouse and stock data: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   private async saveDailyStockSnapshot(
@@ -118,25 +125,47 @@ export class ParserDatabaseService {
     productId: number,
     stockEntries: Array<{ qty: number }>,
   ): Promise<void> {
-    const totalStock = stockEntries.reduce((sum, entry) => sum + entry.qty, 0);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    try {
+      const totalStock = stockEntries.reduce((sum, entry) => sum + entry.qty, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
 
-    await tx.dailyStockSnapshot.upsert({
-      where: {
-        productId_date: {
+      await tx.dailyStockSnapshot.upsert({
+        where: {
+          productId_date: {
+            productId: productId,
+            date: today,
+          },
+        },
+        create: {
           productId: productId,
           date: today,
+          totalStock,
         },
-      },
-      create: {
-        productId: productId,
-        date: today,
-        totalStock,
-      },
-      update: {
-        totalStock,
-      },
+        update: {
+          totalStock,
+        },
+      });
+
+      this.logger.debug(`Saved daily stock snapshot for product ${productId} with total stock: ${totalStock}`);
+    } catch (error) {
+      this.logger.error(`Failed to save daily stock snapshot: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  public async saveCartJson(nmId: number, cardData: ProductCard): Promise<void> {
+
+    const nmIdToNum =  Number(nmId)
+    const createData = {...cardData, nmId: nmIdToNum}
+    const updateData = {...cardData, imtId: Number(cardData.imtId),parsedAt: new Date()}
+
+    await this.prisma.productCart.upsert({
+      where: { nmId: nmIdToNum },
+      create: createData,
+      update: updateData
     });
   }
-} 
+
+
+}

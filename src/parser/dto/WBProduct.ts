@@ -1,5 +1,11 @@
 export type WBProduct = {
     id: number;
+
+    // это одно и то же
+    imtId: number;
+    // это одно и то же
+    root:number;
+
     name?: string;
     brand?: string;
     supplier?: string;

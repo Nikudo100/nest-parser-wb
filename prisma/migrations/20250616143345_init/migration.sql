@@ -1,36 +1,8 @@
-/*
-  Warnings:
-
-  - You are about to drop the column `parsedProductId` on the `DailyStockSnapshot` table. All the data in the column will be lost.
-  - You are about to drop the `OurProduct` table. If the table is not empty, all the data it contains will be lost.
-  - You are about to drop the `ParsedProduct` table. If the table is not empty, all the data it contains will be lost.
-  - A unique constraint covering the columns `[productId,date]` on the table `DailyStockSnapshot` will be added. If there are existing duplicate values, this will fail.
-  - Added the required column `productId` to the `DailyStockSnapshot` table without a default value. This is not possible if the table is not empty.
-
-*/
--- DropForeignKey
-ALTER TABLE "DailyStockSnapshot" DROP CONSTRAINT "DailyStockSnapshot_parsedProductId_fkey";
-
--- DropForeignKey
-ALTER TABLE "OurProduct" DROP CONSTRAINT "OurProduct_parsedProductId_fkey";
-
--- DropIndex
-DROP INDEX "DailyStockSnapshot_parsedProductId_date_key";
-
--- AlterTable
-ALTER TABLE "DailyStockSnapshot" DROP COLUMN "parsedProductId",
-ADD COLUMN     "productId" INTEGER NOT NULL;
-
--- DropTable
-DROP TABLE "OurProduct";
-
--- DropTable
-DROP TABLE "ParsedProduct";
-
 -- CreateTable
 CREATE TABLE "Product" (
     "id" SERIAL NOT NULL,
-    "nmid" BIGINT NOT NULL,
+    "nmId" BIGINT NOT NULL,
+    "imtId" BIGINT,
     "name" TEXT,
     "brand" TEXT,
     "image" TEXT,
@@ -47,6 +19,37 @@ CREATE TABLE "Product" (
     "parsedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Product_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "ProductCart" (
+    "imtId" BIGINT NOT NULL,
+    "nmId" BIGINT NOT NULL,
+    "slug" TEXT,
+    "name" TEXT,
+    "vendorCode" TEXT,
+    "description" TEXT,
+    "options" JSONB,
+    "groupedOptions" JSONB,
+    "certificate" JSONB,
+    "fullColors" JSONB,
+    "selling" JSONB,
+    "media" JSONB,
+    "data" JSONB,
+    "nmColorsNames" TEXT,
+    "contents" TEXT,
+    "hasRich" BOOLEAN,
+    "parsedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- CreateTable
+CREATE TABLE "DailyStockSnapshot" (
+    "id" SERIAL NOT NULL,
+    "date" TIMESTAMP(3) NOT NULL,
+    "totalStock" INTEGER NOT NULL,
+    "productId" INTEGER NOT NULL,
+
+    CONSTRAINT "DailyStockSnapshot_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -69,16 +72,25 @@ CREATE TABLE "WarehouseStock" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Product_nmid_key" ON "Product"("nmid");
+CREATE UNIQUE INDEX "Product_nmId_key" ON "Product"("nmId");
 
 -- CreateIndex
-CREATE INDEX "Product_nmid_idx" ON "Product"("nmid");
+CREATE INDEX "Product_nmId_idx" ON "Product"("nmId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ProductCart_nmId_key" ON "ProductCart"("nmId");
+
+-- CreateIndex
+CREATE INDEX "ProductCart_nmId_idx" ON "ProductCart"("nmId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "DailyStockSnapshot_productId_date_key" ON "DailyStockSnapshot"("productId", "date");
 
 -- CreateIndex
 CREATE INDEX "WarehouseStock_productId_idx" ON "WarehouseStock"("productId");
 
--- CreateIndex
-CREATE UNIQUE INDEX "DailyStockSnapshot_productId_date_key" ON "DailyStockSnapshot"("productId", "date");
+-- AddForeignKey
+ALTER TABLE "ProductCart" ADD CONSTRAINT "ProductCart_nmId_fkey" FOREIGN KEY ("nmId") REFERENCES "Product"("nmId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "DailyStockSnapshot" ADD CONSTRAINT "DailyStockSnapshot_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

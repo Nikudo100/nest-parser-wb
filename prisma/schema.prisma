@@ -8,8 +8,9 @@ datasource db {
 }
 
 model Product {
-  id             Int      @id @default(autoincrement())
-  nmid           BigInt   @unique // WB id
+  id             Int     @id @default(autoincrement())
+  nmId           BigInt  @unique // WB id
+  imtId          BigInt?
   name           String?
   brand          String?
   image          String?
@@ -21,14 +22,50 @@ model Product {
   feedbacks      Int?
   price          Int?
   totalQuantity  Int?
-  is_our_product Boolean  @default(false)
+  is_our_product Boolean @default(false)
   colors         Json?
-  parsedAt       DateTime @default(now())
+
+  parsedAt DateTime @default(now())
+
+  //Обратная связь
+  cart ProductCart?
 
   stockHistory    DailyStockSnapshot[]
   warehouseStocks WarehouseStock[]
 
-  @@index([nmid])
+  @@index([nmId])
+}
+
+model ProductCart {
+  // кажется тут не нужен id
+  // id          Int     @id @default(autoincrement())
+  nmId        BigInt  @unique
+  imtId       BigInt?
+  slug        String?
+  name        String?
+  vendorCode  String?
+  description String?
+
+  // Вложенные структуры в JSON
+  options        Json?
+  groupedOptions Json?
+  certificate    Json?
+  fullColors     Json?
+  selling        Json?
+  media          Json?
+  data           Json?
+
+  // Простые поля
+  nmColorsNames String?
+  contents      String?
+  hasRich       Boolean?
+
+  parsedAt DateTime @default(now())
+
+  // связь с Product я подумал, что id 
+  product Product? @relation(fields: [nmId], references: [nmId])
+
+  @@index([nmId])
 }
 
 model DailyStockSnapshot {
