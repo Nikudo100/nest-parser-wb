@@ -26,11 +26,12 @@ model Product {
   colors         Json?
   parsedAt       DateTime @default(now())
 
-  //Обратная связь
-  cart ProductCart?
-
   stockHistory    DailyStockSnapshot[]
   warehouseStocks WarehouseStock[]
+
+  //Обратная связь
+  cart    ProductCart?
+  cartUrl CartUrl?
 
   @@index([nmId])
 }
@@ -68,7 +69,7 @@ model ProductCart {
 
 model DailyStockSnapshot {
   id         Int      @id @default(autoincrement())
-  date       DateTime
+  date       DateTime @db.Date // Stores only date without time
   totalStock Int
   product    Product  @relation(fields: [productId], references: [id])
   productId  Int
@@ -90,7 +91,16 @@ model WarehouseStock {
   optionId  Int? // sizes[].optionId
   product   Product  @relation(fields: [productId], references: [id])
   productId Int
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @db.Date // Stores only date without time
 
   @@index([productId])
+}
+
+model CartUrl {
+  url       String
+  nmId      Int      @unique
+  product   Product? @relation(fields: [nmId], references: [nmId])
+  createdAt DateTime @default(now())
+
+  @@index([nmId])
 }

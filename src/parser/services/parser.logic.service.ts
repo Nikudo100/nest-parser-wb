@@ -13,35 +13,35 @@ export class ParserLogicService {
     private readonly dbService: ParserDatabaseService,
   ) {}
 
-  /**
-   * Алгоритм 2: Получение похожих товаров по каждому нашему товару
-   */
-  async runSimilarProductsParser(): Promise<void> {
+  async getProductByNmId(nmId: number): Promise<void> {
+    this.logger.log('Запуск getProductByNmId');
+        try {
+          const product = await this.fetchService.fetchProduct(Number(nmId));
+          this.logger.log(await this.dbService.saveProductToDB(product));
+      } catch (err) {
+        this.logger.warn(`Ошибка при обработке NMID=${nmId}: ${err.message}`);
+      }
+  }
+
+  async runSimilarProducts(): Promise<void> {
     this.logger.log('Запуск алгоритма 2: парсинг похожих товаров');
 
-    for (const nmid of allOurProductsNmidTEST) {
+    for (const nmId of allOurProductsNmidTEST) {
       try {
-        const url = `https://recom.wb.ru/visual/ru/common/v5/search?appType=1&curr=rub&dest=-1257786&hide_dtype=13&lang=ru&page=1&query=${nmid}&resultset=catalog&spp=30&suppressSpellcheck=false`;
-        const data = await this.fetchService.fetchJson(url);
-
-        const similarProducts = data?.data?.products || [];
-
-        for (const item of similarProducts) {
-          const product = await this.fetchService.fetchProduct(Number(item.id));
+          const product = await this.fetchService.fetchProduct(Number(nmId));
           this.logger.log(await this.dbService.saveProductToDB(product));
-        }
       } catch (err) {
-        this.logger.warn(`Ошибка при обработке NMID=${nmid}: ${err.message}`);
+        this.logger.warn(`Ошибка при обработке NMID=${nmId}: ${err.message}`);
       }
     }
   }
 
-  async runCardJsonParser(): Promise<void> {
+  async runCardJson(): Promise<void> {
     this.logger.log('Запуск получения card.json для всех товаров');
 
     for (const nmid of allOurProductsNmidTEST) {
       try {
-        const cardData = await this.fetchService.fetchProductCardJson(Number(nmid));
+        const cardData = await this.fetchProductCardJson(Number(nmid));
 
         this.logger.log(`Получен card.json для NMID=${nmid}: ${cardData?.imt_name || 'без имени'}`);
 
@@ -51,6 +51,44 @@ export class ParserLogicService {
       }
     }
   }
+
+  async fetchProductCardJson(nmId: number): Promise<any> {
+    // First check if URL exists in database
+    const existingUrl = await this.dbService.findCartUrl(nmId);
+    if (existingUrl) {
+        try {
+            const data = await this.fetchService.fetchJson(existingUrl.url);
+            return data;
+        } catch (error) {
+            this.logger.warn(`Failed to fetch from cached URL for nmId=${nmId}: ${error.message}`);
+        }
+    }
+
+    const vol = Math.floor(nmId / 100000);
+    const part = Math.floor(nmId / 1000);
+
+    for (let i = 1; i <= 99; i++) {
+        const subdomain = i.toString().padStart(2, '0');
+        const url = `https://basket-${subdomain}.wbbasket.ru/vol${vol}/part${part}/${nmId}/info/ru/card.json`;
+
+        try {
+            const data = await this.fetchService.fetchJson(url);
+            this.logger.log(`Successfully fetched data from URL: ${url}`);
+
+            await this.dbService.saveCartUrl(nmId, url);
+
+            return data;
+        } catch (error) {
+            if (!error.message.includes('404')) {
+                this.logger.error(`Error fetching from URL: ${url}. Error: ${error.message}`);
+                throw new Error(`Ошибка при получении card.json: ${error.message}`);
+            }
+            this.logger.warn(`404 Not Found for URL: ${url}`);
+        }
+    }
+
+    throw new Error(`card.json не найден ни на одном из поддоменов для nmId=${nmId}`);
+}
 
 
   test() {

@@ -187,5 +187,30 @@ export class ParserDatabaseService
     });
   }
 
+  public async saveCartUrl(nmId: number, url: string): Promise<void> {
+    try {
+      const now = new Date();
 
+      if (!this.findCartUrl(nmId)) {
+        await this.prisma.cartUrl.create({
+          data: {
+            nmId,
+            url,
+            createdAt: now
+          }
+        });
+        this.logger.debug(`Successfully saved cart URL for nmId: ${nmId}`);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to save cart URL: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  public async findCartUrl(nmId: number) {
+    const existing = await this.prisma.cartUrl.findUnique({
+      where: { nmId }
+    });
+    return existing
+  }
 }

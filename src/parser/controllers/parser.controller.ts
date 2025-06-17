@@ -5,15 +5,15 @@ import { ParserLogicService } from '../services/parser.logic.service';
 export class ParserController {
   constructor(private readonly ParserLogicService: ParserLogicService) {}
 
-  // @Get('product/:id')
-  // async getProductCard(@Param('id', ParseIntPipe) id: number) {
-  //   return this.ParserLogicService.processProductCard(id);
-  // }
+  @Get('product/:id')
+  async getProductCard(@Param('id', ParseIntPipe) id: number) {
+    return this.ParserLogicService.getProductByNmId(id);
+  }
 
 
   @Get('alg1')
   async runAlg1() {
-    return this.ParserLogicService.runSimilarProductsParser();
+    return this.ParserLogicService.runSimilarProducts();
   }
 
   // @Get('alg2')
@@ -21,8 +21,8 @@ export class ParserController {
   //   return this.ParserLogicService.runSimilarProductsParser();
   // }
   @Get('card')
-  async runCardJsonParser() {
-    return this.ParserLogicService.runCardJsonParser();
+  async runCardJson() {
+    return this.ParserLogicService.runCardJson();
   }
 
 
