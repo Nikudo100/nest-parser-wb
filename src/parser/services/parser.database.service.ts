@@ -6,7 +6,8 @@ import { WBProduct } from '../dto/WBProduct';
 
 import { allOurProductsNmid } from '../storage/allOurProductsNmid';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { ProductCard } from '../dto/ProductCard';
+import { convertKeysToCamelCase } from '../helpers/parser.main.helpers';
+// import { ProductCardDto } from '../dto/ProductCard';
 
 @Injectable()
 export class ParserDatabaseService 
@@ -157,36 +158,28 @@ export class ParserDatabaseService
   }
 
   public async saveCartJson(nmId: number, rawData: any): Promise<void> {
-    const productCard = plainToInstance(ProductCard, rawData);
-
-    const errors = await validate(productCard);
-    if (errors.length > 0) {
-      console.error('Validation failed', errors);
-      throw new Error('ProductCard validation failed');
-    }
-
     const nmIdToNum = Number(nmId);
-
-    // ✅ Преобразуем instance в plain-объект
-    const plainCard = instanceToPlain(productCard) as any;
-
+  
+    const camelCaseData = convertKeysToCamelCase(rawData);
+    const plainCard = instanceToPlain(camelCaseData);
+    const parsedAt = new Date();
+  
+    // Проверим наличие Product с таким nmId
+    const product = await this.prisma.product.findUnique({
+      where: { nmId: nmIdToNum }
+    });
+  
+    if (!product) {
+      throw new Error(`Product with nmId ${nmIdToNum} not found`);
+    }
+  
+    // Готовим данные для вставки
     const processedCard = {
-      ...plainCard,
       nmId: nmIdToNum,
-      imtId: Number(plainCard.imtId),
-      parsedAt: new Date(),
-      
-      // ✅ Сериализуем JSON-поля (если они в Prisma определены как `Json`)
-      options: JSON.stringify(plainCard.options),
-      groupedOptions: JSON.stringify(plainCard.groupedOptions),
-      colors: JSON.stringify(plainCard.colors),
-      fullColors: JSON.stringify(plainCard.fullColors),
-      data: JSON.stringify(plainCard.data),
-      certificate: JSON.stringify(plainCard.certificate),
-      selling: JSON.stringify(plainCard.selling),
-      media: JSON.stringify(plainCard.media),
+      imtId: plainCard.imtId ? Number(plainCard.imtId) : undefined,
     };
-
+  
+    // upsert с корректным синтаксисом
     await this.prisma.productCart.upsert({
       where: { nmId: nmIdToNum },
       create: processedCard,

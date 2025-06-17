@@ -8,9 +8,9 @@ datasource db {
 }
 
 model Product {
-  id             Int     @id @default(autoincrement())
-  nmId           BigInt  @unique // WB id
-  imtId          BigInt?
+  id             Int      @id @default(autoincrement())
+  nmId           Int      @unique // WB id
+  imtId          Int?
   name           String?
   brand          String?
   image          String?
@@ -22,10 +22,9 @@ model Product {
   feedbacks      Int?
   price          Int?
   totalQuantity  Int?
-  is_our_product Boolean @default(false)
+  is_our_product Boolean  @default(false)
   colors         Json?
-
-  parsedAt DateTime @default(now())
+  parsedAt       DateTime @default(now())
 
   //Обратная связь
   cart ProductCart?
@@ -39,8 +38,8 @@ model Product {
 model ProductCart {
   // кажется тут не нужен id
   // id          Int     @id @default(autoincrement())
-  nmId        BigInt  @unique
-  imtId       BigInt?
+  nmId        Int     @unique
+  imtId       Int?
   slug        String?
   name        String?
   vendorCode  String?
@@ -59,10 +58,9 @@ model ProductCart {
   nmColorsNames String?
   contents      String?
   hasRich       Boolean?
+  parsedAt      DateTime @default(now())
 
-  parsedAt DateTime @default(now())
-
-  // связь с Product я подумал, что id 
+  // связь с Product я подумал, что связь по nmId будет быстрее
   product Product? @relation(fields: [nmId], references: [nmId])
 
   @@index([nmId])
@@ -79,21 +77,19 @@ model DailyStockSnapshot {
 }
 
 model WarehouseStock {
-  id       Int     @id @default(autoincrement())
-  wh       Int // ID склада
-  dtype    Int?
-  dist     Int?
-  qty      Int
-  priority Int?
-  time1    Int?
-  time2    Int?
-  sizeName String? // sizes[].name
-  sizeRank Int? // sizes[].rank
-  optionId BigInt? // sizes[].optionId
-
-  product   Product @relation(fields: [productId], references: [id])
+  id        Int      @id @default(autoincrement())
+  wh        Int // ID склада
+  dtype     Int?
+  dist      Int?
+  qty       Int
+  priority  Int?
+  time1     Int?
+  time2     Int?
+  sizeName  String? // sizes[].name
+  sizeRank  Int? // sizes[].rank
+  optionId  Int? // sizes[].optionId
+  product   Product  @relation(fields: [productId], references: [id])
   productId Int
-
   createdAt DateTime @default(now())
 
   @@index([productId])

@@ -42,6 +42,7 @@ export class ParserLogicService {
     for (const nmid of allOurProductsNmidTEST) {
       try {
         const cardData = await this.fetchService.fetchProductCardJson(Number(nmid));
+
         this.logger.log(`Получен card.json для NMID=${nmid}: ${cardData?.imt_name || 'без имени'}`);
 
         this.dbService.saveCartJson(Number(nmid), cardData)
