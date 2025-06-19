@@ -26,19 +26,17 @@ model Product {
   colors         Json?
   parsedAt       DateTime @default(now())
 
-  stockHistory    DailyStockSnapshot[]
-  warehouseStocks WarehouseStock[]
+  stockHistory    DailyStockSnapshot[] @relation("ProductToStockHistory")
+  warehouseStocks WarehouseStock[]     @relation("ProductToWarehouseStock")
 
   //Обратная связь
-  cart    ProductCart?
-  cartUrl CartUrl?
+  cart    ProductCart? @relation("ProductToCart")
+  cartUrl CartUrl?     @relation("ProductToCartUrl")
 
   @@index([nmId])
 }
 
 model ProductCart {
-  // кажется тут не нужен id
-  // id          Int     @id @default(autoincrement())
   nmId        Int     @unique
   imtId       Int?
   slug        String?
@@ -62,7 +60,7 @@ model ProductCart {
   parsedAt      DateTime @default(now())
 
   // связь с Product я подумал, что связь по nmId будет быстрее
-  product Product? @relation(fields: [nmId], references: [nmId])
+  product Product? @relation("ProductToCart", fields: [nmId], references: [nmId], onDelete: Cascade)
 
   @@index([nmId])
 }
@@ -71,7 +69,7 @@ model DailyStockSnapshot {
   id         Int      @id @default(autoincrement())
   date       DateTime @db.Date // Stores only date without time
   totalStock Int
-  product    Product  @relation(fields: [productId], references: [id])
+  product    Product  @relation("ProductToStockHistory", fields: [productId], references: [id], onDelete: Cascade)
   productId  Int
 
   @@unique([productId, date]) // Чтобы не было дубликатов по дате
@@ -89,7 +87,7 @@ model WarehouseStock {
   sizeName  String? // sizes[].name
   sizeRank  Int? // sizes[].rank
   optionId  Int? // sizes[].optionId
-  product   Product  @relation(fields: [productId], references: [id])
+  product   Product  @relation("ProductToWarehouseStock", fields: [productId], references: [id], onDelete: Cascade)
   productId Int
   createdAt DateTime @default(now()) @db.Date // Stores only date without time
 
@@ -99,7 +97,7 @@ model WarehouseStock {
 model CartUrl {
   url       String
   nmId      Int      @unique
-  product   Product? @relation(fields: [nmId], references: [nmId])
+  product   Product? @relation("ProductToCartUrl", fields: [nmId], references: [nmId], onDelete: Cascade)
   createdAt DateTime @default(now())
 
   @@index([nmId])

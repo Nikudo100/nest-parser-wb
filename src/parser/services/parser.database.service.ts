@@ -10,7 +10,7 @@ import { convertKeysToCamelCase } from '../helpers/parser.main.helpers';
 // import { ProductCardDto } from '../dto/ProductCard';
 
 @Injectable()
-export class ParserDatabaseService 
+export class ParserDatabaseService
 {
   constructor(private prisma: PrismaService) {}
 
@@ -20,6 +20,7 @@ export class ParserDatabaseService
     try {
       const savedProduct = await this.saveBasicProductInfo(product);
       await this.processWarehouseAndStockData(savedProduct, product.sizes);
+      await this.saveDailyStockSnapshot(product.id, product.totalQuantity);
       return savedProduct;
     } catch (error) {
       this.logger.error(`Failed to save product to DB: ${error.message}`, error.stack);
@@ -111,7 +112,7 @@ export class ParserDatabaseService
             this.logger.debug(`Created ${stockEntries.length} warehouse stock entries for product ${savedProduct.id}`);
           }
 
-          await this.saveDailyStockSnapshot(tx, savedProduct.id, stockEntries);
+          
         } catch (error) {
           this.logger.error(`Transaction failed: ${error.message}`, error.stack);
           throw error;
@@ -124,16 +125,15 @@ export class ParserDatabaseService
   }
 
   private async saveDailyStockSnapshot(
-    tx: any,
     productId: number,
-    stockEntries: Array<{ qty: number }>,
+    totalQuantity,
   ): Promise<void> {
     try {
-      const totalStock = stockEntries.reduce((sum, entry) => sum + entry.qty, 0);
+      const totalStock = totalQuantity;
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      await tx.dailyStockSnapshot.upsert({
+      await  await this.prisma.dailyStockSnapshot.upsert({
         where: {
           productId_date: {
             productId: productId,
@@ -159,26 +159,25 @@ export class ParserDatabaseService
 
   public async saveCartJson(nmId: number, rawData: any): Promise<void> {
     const nmIdToNum = Number(nmId);
-  
     const camelCaseData = convertKeysToCamelCase(rawData);
     const plainCard = instanceToPlain(camelCaseData);
     const parsedAt = new Date();
-  
+
     // Проверим наличие Product с таким nmId
     const product = await this.prisma.product.findUnique({
       where: { nmId: nmIdToNum }
     });
-  
+
     if (!product) {
       throw new Error(`Product with nmId ${nmIdToNum} not found`);
     }
-  
+
     // Готовим данные для вставки
     const processedCard = {
       nmId: nmIdToNum,
       imtId: plainCard.imtId ? Number(plainCard.imtId) : undefined,
     };
-  
+
     // upsert с корректным синтаксисом
     await this.prisma.productCart.upsert({
       where: { nmId: nmIdToNum },
@@ -212,5 +211,167 @@ export class ParserDatabaseService
       where: { nmId }
     });
     return existing
+  }
+
+  public async saveManyProductsToDB(products: WBProduct[]): Promise<void> {
+    try {
+      const productBaseData: Array<{
+        nmId: number;
+        imtId: number;
+        name?: string;
+        brand?: string;
+        supplier?: string;
+        supplierId?: number;
+        supplierRating?: number;
+        rating?: number;
+        reviewRating?: number;
+        feedbacks?: number;
+        totalQuantity?: number;
+        colors?: string;
+        is_our_product: boolean;
+        image: string | null;
+        price: number | null;
+        parsedAt: Date;
+      }> = [];
+  
+      for (const product of products) {
+        const id = Number(product.id);
+        const isOurProduct = allOurProductsNmid.includes(id.toString());
+        const sizes = product.sizes;
+  
+        const price = sizes?.[0]?.price?.total
+          ? Math.round(sizes[0].price.total / 100)
+          : null;
+  
+        const image =
+          product.pics && product.pics > 0
+            ? `https://images.wbstatic.net/big/new/${Math.floor(id / 10000)}0000/${id}-1.jpg`
+            : null;
+  
+        productBaseData.push({
+          nmId: id,
+          imtId: Number(product.root),
+          name: product.name,
+          brand: product.brand,
+          supplier: product.supplier,
+          supplierId: product.supplierId,
+          supplierRating: product.supplierRating,
+          rating: product.rating,
+          reviewRating: product.reviewRating,
+          feedbacks: product.feedbacks,
+          totalQuantity: product.totalQuantity,
+          colors: Array.isArray(product.colors) ? JSON.stringify(product.colors) : product.colors,
+          is_our_product: isOurProduct,
+          image,
+          price,
+          parsedAt: new Date(),
+        });
+      }
+  
+      // Разбиваем на батчи по 100
+      const chunkArray = <T>(arr: T[], size: number): T[][] =>
+        Array.from({ length: Math.ceil(arr.length / size) }, (_, i) =>
+          arr.slice(i * size, i * size + size)
+        );
+  
+      const chunks = chunkArray(productBaseData, 100);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+  
+      for (const [i, chunk] of chunks.entries()) {
+        await this.prisma.$transaction(async (tx) => {
+          const upsertedProducts = await Promise.all(
+            chunk.map(baseData =>
+              tx.product.upsert({
+                where: { nmId: baseData.nmId },
+                create: baseData,
+                update: {
+                  ...baseData,
+                  parsedAt: new Date(),
+                },
+              })
+            )
+          );
+  
+          const productIds = upsertedProducts.map(p => p.id);
+  
+          await tx.warehouseStock.deleteMany({
+            where: {
+              productId: { in: productIds },
+            },
+          });
+  
+          await Promise.all(
+            upsertedProducts.map(product => {
+              const baseData = chunk.find(p => p.nmId === product.nmId);
+              if (!baseData) return Promise.resolve();
+  
+              return tx.dailyStockSnapshot.upsert({
+                where: {
+                  productId_date: {
+                    productId: product.id,
+                    date: today,
+                  },
+                },
+                create: {
+                  productId: product.id,
+                  date: today,
+                  totalStock: baseData.totalQuantity || 0,
+                },
+                update: {
+                  totalStock: baseData.totalQuantity || 0,
+                },
+              });
+            })
+          );
+        }, {
+          timeout: 20_000,
+        });
+  
+        this.logger.log(`✅ Saved batch ${i + 1}/${chunks.length} (${chunk.length} products)`);
+      }
+  
+      this.logger.log(`✅ All ${productBaseData.length} products saved in ${chunks.length} batches.`);
+    } catch (error) {
+      this.logger.error(`❌ Failed to save products in bulk: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  public async deleteAllProducts(): Promise<void> {
+    try {
+      await this.prisma.$transaction(async (tx) => {
+
+        // Finally delete all products
+        await tx.product.deleteMany({});
+
+        this.logger.log('✅ Successfully deleted all products and related data');
+      });
+    } catch (error) {
+      this.logger.error(`❌ Failed to delete products: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  public async getProductsCount() {
+    try {
+      const count = await this.prisma.product.count();
+      this.logger.log(`Total products count: ${count}`);
+      return `Total products count: ${count}`;
+    } catch (error) {
+      this.logger.error(`Failed to get products count: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  public async getAllProducts() {
+    try {
+      const products = await this.prisma.product.findMany();
+      this.logger.debug(`Retrieved ${products.length} products from database`);
+      return products;
+    } catch (error) {
+      this.logger.error(`Failed to get all products: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 }

@@ -3,6 +3,7 @@ import { ParserFetchService } from './parser.fetch.service';
 import { ParserDatabaseService } from './parser.database.service';
 import { allOurProductsNmid } from '../storage/allOurProductsNmid';
 import { allOurProductsNmidTEST } from '../storage/allOurProductsNmidTEST';
+import { WBProduct } from '../dto/WBProduct';
 
 @Injectable()
 export class ParserLogicService {
@@ -25,8 +26,8 @@ export class ParserLogicService {
 
   async runSimilarProducts(): Promise<void> {
     this.logger.log('Запуск алгоритма 2: парсинг похожих товаров');
-
-    for (const nmId of allOurProductsNmidTEST) {
+    const products = await this.getAllProducts();
+    for (const nmId of products) {
       try {
           const product = await this.fetchService.fetchProduct(Number(nmId));
           this.logger.log(await this.dbService.saveProductToDB(product));
@@ -88,7 +89,55 @@ export class ParserLogicService {
     }
 
     throw new Error(`card.json не найден ни на одном из поддоменов для nmId=${nmId}`);
-}
+  }
+
+  // async getRecommendedForOurProducts() {
+  //   this.logger.log('Запуск получения card.json для всех товаров');
+  //   for (const nmid of allOurProductsNmidTEST) {
+  //     try {
+  //       const products = await this.fetchService.fetchRecommended(Number(nmid))
+  //       for (const product of products){
+  //         this.dbService.saveProductToDB(product)
+  //       }
+  //     } catch (err) {
+  //       this.logger.warn(`Не удалось получить card.json для NMID=${nmid}: ${err.message}`);
+  //     }
+  //   }
+  // }
+
+  async getRecommendedForOurProducts() {
+    this.logger.log('Recommended Products');
+
+    const allProducts: WBProduct[] = [];
+
+    for (const nmid of allOurProductsNmid) {
+      try {
+        const products = await this.fetchService.fetchRecommended(Number(nmid));
+
+        allProducts.push(...products);
+      } catch (err) {
+        this.logger.warn(`Recommended Products для NMID=${nmid}: ${err.message}`);
+      }
+    }
+
+    if (allProducts.length > 0) {
+        await this.dbService.saveManyProductsToDB(allProducts);
+    }
+  }
+
+  async getAllProducts() {
+    const products = await this.dbService.getAllProducts();
+    console.log(products)
+    return products.map(product => product.nmId);
+  }
+
+  deleteAllProducts() {
+    return this.dbService.deleteAllProducts()
+  }
+
+  getProductsCount() {
+    return this.dbService.getProductsCount();
+  }
 
 
   test() {

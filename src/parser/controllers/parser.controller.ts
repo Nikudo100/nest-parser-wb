@@ -11,15 +11,20 @@ export class ParserController {
   }
 
 
-  @Get('alg1')
-  async runAlg1() {
+  // @Get('alg1')
+  // async runAlg1() {
+  //   return this.ParserLogicService.runSimilarProducts();
+  // }
+  @Get('alg2')
+  async runAlg2() {
     return this.ParserLogicService.runSimilarProducts();
   }
 
-  // @Get('alg2')
-  // async runAlg2() {
-  //   return this.ParserLogicService.runSimilarProductsParser();
-  // }
+  @Get('recommended')
+  async recommended() {
+    return this.ParserLogicService.getRecommendedForOurProducts();
+  }
+
   @Get('card')
   async runCardJson() {
     return this.ParserLogicService.runCardJson();
@@ -27,6 +32,14 @@ export class ParserController {
 
 
 
+  @Get('count')
+  async getProductsCount() {
+    return this.ParserLogicService.getProductsCount();
+  }
+  @Get('dropAll')
+  async dropAll() {
+    return this.ParserLogicService.deleteAllProducts();
+  }
   @Get('test')
   async test() {
     return this.ParserLogicService.test();

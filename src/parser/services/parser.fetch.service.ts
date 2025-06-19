@@ -33,6 +33,35 @@ export class ParserFetchService {
         }
     }
 
+    async fetchRecommended(nmId: number): Promise<WBProduct[]> {
+        let page = 1;
+        let allProducts: WBProduct[] = [];
 
+        while (true) {
+            this.logger.log(`page: ${page}`);
+
+            const url = `https://recom.wb.ru/visual/ru/common/v5/search?appType=1&curr=rub&dest=-1257786&hide_dtype=13&lang=ru&page=${page}&query=${nmId}&resultset=catalog&spp=30&suppressSpellcheck=false`;
+
+            try {
+                const data = await this.fetchJson(url);
+                const products = data?.data?.products as WBProduct[];
+
+                if (!products || products.length === 0) {
+                    break;
+                }
+                const filtered = products.filter(
+                    p => (p.supplierRating ?? 0) > 4 && (p.feedbacks ?? 0) > 300
+                  );
+
+                allProducts.push(...filtered);
+
+                page++;
+            } catch (error) {
+                throw new Error(`Ошибка при получении товара: ${error.message}`);
+            }
+        }
+
+        return allProducts;
+    }
 
 }
