@@ -64,4 +64,26 @@ export class ParserFetchService {
         return allProducts;
     }
 
+    async fetchCard(nmId: number){
+        const vol = Math.floor(nmId / 100000);
+        const part = Math.floor(nmId / 1000);
+
+        for (let i = 1; i <= 99; i++) {
+            const subdomain = i.toString().padStart(2, '0');
+            const url = `https://basket-${subdomain}.wbbasket.ru/vol${vol}/part${part}/${nmId}/info/ru/card.json`;
+
+            try {
+                const data = await this.fetchJson(url);
+                this.logger.log(`Successfully fetched data from URL: ${url}`);
+
+                return {data, url};
+            } catch (error) {
+                if (!error.message.includes('404')) {
+                    this.logger.error(`Error fetching from URL: ${url}. Error: ${error.message}`);
+                    throw new Error(`Ошибка при получении card.json: ${error.message}`);
+                }
+                this.logger.warn(`404 Not Found for URL: ${url}`);
+            }
+        }
+    }
 }

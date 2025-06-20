@@ -25,16 +25,24 @@ export class ParserController {
     return this.ParserLogicService.getRecommendedForOurProducts();
   }
 
-  @Get('card')
+  @Get('cards')
   async runCardJson() {
     return this.ParserLogicService.runCardJson();
   }
 
 
 
-  @Get('count')
+  @Get('products')
+  async getAllProducts() {
+    return this.ParserLogicService.getAllProducts();
+  }
+  @Get('products/count')
   async getProductsCount() {
     return this.ParserLogicService.getProductsCount();
+  }
+  @Get('cartUrls/count')
+  async getCartUrlCount() {
+    return this.ParserLogicService.getCartUrlCount();
   }
   @Get('dropAll')
   async dropAll() {

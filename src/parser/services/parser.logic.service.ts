@@ -26,13 +26,13 @@ export class ParserLogicService {
 
   async runSimilarProducts(): Promise<void> {
     this.logger.log('Запуск алгоритма 2: парсинг похожих товаров');
-    const products = await this.getAllProducts();
+    const products = await this.getAllProductsNmids();
     for (const nmId of products) {
       try {
-          const product = await this.fetchService.fetchProduct(Number(nmId));
-          this.logger.log(await this.dbService.saveProductToDB(product));
+          const product = await this.fetchService.fetchProduct(Number(nmId))
+          await this.dbService.saveProductToDB(product)
       } catch (err) {
-        this.logger.warn(`Ошибка при обработке NMID=${nmId}: ${err.message}`);
+        this.logger.warn(`Ошибка при обработке NMID=${nmId}: ${err.message}`)
       }
     }
   }
@@ -40,13 +40,14 @@ export class ParserLogicService {
   async runCardJson(): Promise<void> {
     this.logger.log('Запуск получения card.json для всех товаров');
 
-    for (const nmid of allOurProductsNmidTEST) {
+    const products = await this.getAllProductsNmids();
+    for (const nmid of products) {
       try {
         const cardData = await this.fetchProductCardJson(Number(nmid));
 
         this.logger.log(`Получен card.json для NMID=${nmid}: ${cardData?.imt_name || 'без имени'}`);
 
-        this.dbService.saveCartJson(Number(nmid), cardData)
+        // await this.dbService.saveCartJson(Number(nmid), cardData);
       } catch (err) {
         this.logger.warn(`Не удалось получить card.json для NMID=${nmid}: ${err.message}`);
       }
@@ -54,41 +55,29 @@ export class ParserLogicService {
   }
 
   async fetchProductCardJson(nmId: number): Promise<any> {
-    // First check if URL exists in database
     const existingUrl = await this.dbService.findCartUrl(nmId);
     if (existingUrl) {
         try {
-            const data = await this.fetchService.fetchJson(existingUrl.url);
-            return data;
+            // const data = await this.fetchService.fetchJson(existingUrl.url);
+            await this.dbService.updateProductImage(nmId, existingUrl.url);
+            // return data;
         } catch (error) {
             this.logger.warn(`Failed to fetch from cached URL for nmId=${nmId}: ${error.message}`);
         }
     }
+     else {
+      const res = await this.fetchService.fetchCard(nmId);
 
-    const vol = Math.floor(nmId / 100000);
-    const part = Math.floor(nmId / 1000);
+      if (!res)
+      {
+        throw new Error(`Failed to fetch card data for nmId=${nmId}`);
+      }
+      const data = res.data;
+      await this.dbService.saveCartUrl(nmId, res.url);
+      await this.dbService.updateProductImage(nmId, res.url);
 
-    for (let i = 1; i <= 99; i++) {
-        const subdomain = i.toString().padStart(2, '0');
-        const url = `https://basket-${subdomain}.wbbasket.ru/vol${vol}/part${part}/${nmId}/info/ru/card.json`;
-
-        try {
-            const data = await this.fetchService.fetchJson(url);
-            this.logger.log(`Successfully fetched data from URL: ${url}`);
-
-            await this.dbService.saveCartUrl(nmId, url);
-
-            return data;
-        } catch (error) {
-            if (!error.message.includes('404')) {
-                this.logger.error(`Error fetching from URL: ${url}. Error: ${error.message}`);
-                throw new Error(`Ошибка при получении card.json: ${error.message}`);
-            }
-            this.logger.warn(`404 Not Found for URL: ${url}`);
-        }
+      return data;
     }
-
-    throw new Error(`card.json не найден ни на одном из поддоменов для nmId=${nmId}`);
   }
 
   // async getRecommendedForOurProducts() {
@@ -126,8 +115,11 @@ export class ParserLogicService {
   }
 
   async getAllProducts() {
-    const products = await this.dbService.getAllProducts();
-    console.log(products)
+    return await this.dbService.getAllProducts();
+  }
+
+  async getAllProductsNmids() {
+    const products = await this.getAllProducts();
     return products.map(product => product.nmId);
   }
 
@@ -137,6 +129,9 @@ export class ParserLogicService {
 
   getProductsCount() {
     return this.dbService.getProductsCount();
+  }
+  getCartUrlCount() {
+    return this.dbService.getCartUrlCount();
   }
 
 

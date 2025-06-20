@@ -16,12 +16,12 @@ export class ParserDatabaseService
 
   private readonly logger = new Logger(ParserDatabaseService.name);
 
-  public async saveProductToDB(product: WBProduct): Promise<Product> {
+  public async saveProductToDB(product: WBProduct) {
     try {
       const savedProduct = await this.saveBasicProductInfo(product);
       await this.processWarehouseAndStockData(savedProduct, product.sizes);
-      await this.saveDailyStockSnapshot(product.id, product.totalQuantity);
-      return savedProduct;
+      await this.saveDailyStockSnapshot(savedProduct.id, product.totalQuantity);
+      return savedProduct.nmId;
     } catch (error) {
       this.logger.error(`Failed to save product to DB: ${error.message}`, error.stack);
       throw error;
@@ -38,10 +38,7 @@ export class ParserDatabaseService
         ? Math.round(sizes[0].price.total / 100)
         : null;
 
-      const image =
-        product.pics && product.pics.length > 0
-          ? `https://images.wbstatic.net/big/new/${Math.floor(id / 10000)}0000/${id}-1.jpg`
-          : null;
+      const image = null;
 
       const baseData = {
         nmId: id,
@@ -188,18 +185,31 @@ export class ParserDatabaseService
 
   public async saveCartUrl(nmId: number, url: string): Promise<void> {
     try {
-      const now = new Date();
+      // First check if product exists
+      const product = await this.prisma.product.findUnique({
+        where: { nmId }
+      });
 
-      if (!this.findCartUrl(nmId)) {
+      if (!product) {
+        throw new Error(`Product with nmId ${nmId} not found`);
+      }
+
+      // Check if cart URL already exists
+      const existing = await this.prisma.cartUrl.findUnique({
+        where: { nmId }
+      });
+
+      // Only create new record if it doesn't exist
+      if (!existing) {
         await this.prisma.cartUrl.create({
           data: {
             nmId,
             url,
-            createdAt: now
           }
         });
-        this.logger.debug(`Successfully saved cart URL for nmId: ${nmId}`);
+        this.logger.debug(`Successfully saved new cart URL for nmId: ${nmId}`);
       }
+
     } catch (error) {
       this.logger.error(`Failed to save cart URL: ${error.message}`, error.stack);
       throw error;
@@ -207,10 +217,14 @@ export class ParserDatabaseService
   }
 
   public async findCartUrl(nmId: number) {
-    const existing = await this.prisma.cartUrl.findUnique({
-      where: { nmId }
-    });
-    return existing
+    try {
+      return await this.prisma.cartUrl.findUnique({
+        where: { nmId }
+      });
+    } catch (error) {
+      this.logger.error(`Failed to find cart URL: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   public async saveManyProductsToDB(products: WBProduct[]): Promise<void> {
@@ -243,10 +257,7 @@ export class ParserDatabaseService
           ? Math.round(sizes[0].price.total / 100)
           : null;
   
-        const image =
-          product.pics && product.pics > 0
-            ? `https://images.wbstatic.net/big/new/${Math.floor(id / 10000)}0000/${id}-1.jpg`
-            : null;
+        const image = null;
   
         productBaseData.push({
           nmId: id,
@@ -357,20 +368,64 @@ export class ParserDatabaseService
     try {
       const count = await this.prisma.product.count();
       this.logger.log(`Total products count: ${count}`);
-      return `Total products count: ${count}`;
+      return { count };
     } catch (error) {
       this.logger.error(`Failed to get products count: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+  public async getCartUrlCount() {
+    try {
+      const count = await this.prisma.cartUrl.count();
+      this.logger.log(`Total cart Url count: ${count}`);
+      return { count };
+    } catch (error) {
+      this.logger.error(`Failed to get cart Url count: ${error.message}`, error.stack);
       throw error;
     }
   }
 
   public async getAllProducts() {
     try {
-      const products = await this.prisma.product.findMany();
+      const products = await this.prisma.product.findMany({
+        where: {
+          price: {
+            gte: 300 // Filter products with price >= 300
+          }
+        },
+        orderBy: [
+          {
+            rating: 'desc',
+          },
+          {
+            feedbacks: 'desc',
+          },
+        ],
+      });
       this.logger.debug(`Retrieved ${products.length} products from database`);
       return products;
     } catch (error) {
       this.logger.error(`Failed to get all products: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+
+  public async updateProductImage(nmId: number, url: string): Promise<void> {
+    try {
+      const newImage = url.replace('info/ru/card.json', 'images/big/1.webp')
+      
+      await this.prisma.product.update({
+        where: { nmId },
+        data: { 
+          image: newImage,
+          parsedAt: new Date()
+        }
+      });
+
+      this.logger.debug(`Successfully updated image for product with nmId: ${nmId}`);
+    } catch (error) {
+      this.logger.error(`Failed to update product image: ${error.message}`, error.stack);
       throw error;
     }
   }
