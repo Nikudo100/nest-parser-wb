@@ -11,6 +11,9 @@ const nextConfig = {
       },
     ],
   },
+  allowedDevOrigins: [
+    'http://109.172.39.82:3004',
+  ],
 };
 
 export default nextConfig;
