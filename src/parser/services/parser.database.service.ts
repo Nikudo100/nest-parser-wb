@@ -10,9 +10,8 @@ import { convertKeysToCamelCase } from '../helpers/parser.main.helpers';
 // import { ProductCardDto } from '../dto/ProductCard';
 
 @Injectable()
-export class ParserDatabaseService
-{
-  constructor(private prisma: PrismaService) {}
+export class ParserDatabaseService {
+  constructor(private prisma: PrismaService) { }
 
   private readonly logger = new Logger(ParserDatabaseService.name);
 
@@ -109,7 +108,7 @@ export class ParserDatabaseService
             this.logger.debug(`Created ${stockEntries.length} warehouse stock entries for product ${savedProduct.id}`);
           }
 
-          
+
         } catch (error) {
           this.logger.error(`Transaction failed: ${error.message}`, error.stack);
           throw error;
@@ -130,7 +129,7 @@ export class ParserDatabaseService
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      await  await this.prisma.dailyStockSnapshot.upsert({
+      await await this.prisma.dailyStockSnapshot.upsert({
         where: {
           productId_date: {
             productId: productId,
@@ -247,18 +246,18 @@ export class ParserDatabaseService
         price: number | null;
         parsedAt: Date;
       }> = [];
-  
+
       for (const product of products) {
         const id = Number(product.id);
         const isOurProduct = allOurProductsNmid.includes(id.toString());
         const sizes = product.sizes;
-  
+
         const price = sizes?.[0]?.price?.total
           ? Math.round(sizes[0].price.total / 100)
           : null;
-  
+
         const image = null;
-  
+
         productBaseData.push({
           nmId: id,
           imtId: Number(product.root),
@@ -278,17 +277,17 @@ export class ParserDatabaseService
           parsedAt: new Date(),
         });
       }
-  
+
       // Разбиваем на батчи по 100
       const chunkArray = <T>(arr: T[], size: number): T[][] =>
         Array.from({ length: Math.ceil(arr.length / size) }, (_, i) =>
           arr.slice(i * size, i * size + size)
         );
-  
+
       const chunks = chunkArray(productBaseData, 100);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-  
+
       for (const [i, chunk] of chunks.entries()) {
         await this.prisma.$transaction(async (tx) => {
           const upsertedProducts = await Promise.all(
@@ -303,20 +302,20 @@ export class ParserDatabaseService
               })
             )
           );
-  
+
           const productIds = upsertedProducts.map(p => p.id);
-  
+
           await tx.warehouseStock.deleteMany({
             where: {
               productId: { in: productIds },
             },
           });
-  
+
           await Promise.all(
             upsertedProducts.map(product => {
               const baseData = chunk.find(p => p.nmId === product.nmId);
               if (!baseData) return Promise.resolve();
-  
+
               return tx.dailyStockSnapshot.upsert({
                 where: {
                   productId_date: {
@@ -338,10 +337,10 @@ export class ParserDatabaseService
         }, {
           timeout: 20_000,
         });
-  
+
         this.logger.log(`✅ Saved batch ${i + 1}/${chunks.length} (${chunk.length} products)`);
       }
-  
+
       this.logger.log(`✅ All ${productBaseData.length} products saved in ${chunks.length} batches.`);
     } catch (error) {
       this.logger.error(`❌ Failed to save products in bulk: ${error.message}`, error.stack);
@@ -410,14 +409,68 @@ export class ParserDatabaseService
     }
   }
 
+  public async getAllProductsWithParams(params: {
+    brand?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    minRating?: number;
+    minFeedbacks?: number;
+    skip?: number;
+    take?: number;
+  }) {
+    const {
+      brand,
+      minPrice = 0,
+      maxPrice,
+      minRating = 0,
+      minFeedbacks = 0,
+      skip = 0,
+      take = 20,
+    } = params;
+
+    try {
+      const products = await this.prisma.product.findMany({
+        where: {
+          price: {
+            gte: minPrice,
+            ...(maxPrice ? { lte: maxPrice } : {}),
+          },
+          rating: { gte: minRating },
+          feedbacks: { gte: minFeedbacks },
+          ...(brand ? { brand } : {}),
+        },
+        orderBy: [
+          { rating: 'desc' },
+          { feedbacks: 'desc' },
+        ],
+        skip,
+        take,
+      });
+
+      const total = await this.prisma.product.count({
+        where: {
+          price: { gte: minPrice, ...(maxPrice ? { lte: maxPrice } : {}) },
+          rating: { gte: minRating },
+          feedbacks: { gte: minFeedbacks },
+          ...(brand ? { brand } : {}),
+        },
+      });
+
+      return { products, total };
+    } catch (error) {
+      this.logger.error(`Failed to get products: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
 
   public async updateProductImage(nmId: number, url: string): Promise<void> {
     try {
       const newImage = url.replace('info/ru/card.json', 'images/big/1.webp')
-      
+
       await this.prisma.product.update({
         where: { nmId },
-        data: { 
+        data: {
           image: newImage,
           parsedAt: new Date()
         }

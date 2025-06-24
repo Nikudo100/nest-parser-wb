@@ -3,7 +3,7 @@ import { ParserLogicService } from '../services/parser.logic.service';
 
 @Controller('parser')
 export class ParserController {
-  constructor(private readonly ParserLogicService: ParserLogicService) {}
+  constructor(private readonly ParserLogicService: ParserLogicService) { }
 
   @Get('product/:id')
   async getProductCard(@Param('id', ParseIntPipe) id: number) {
@@ -32,10 +32,34 @@ export class ParserController {
 
 
 
-  @Get('products')
+  @Get('products1')
   async getAllProducts() {
     return this.ParserLogicService.getAllProducts();
   }
+
+  @Get('products')
+  async getAllProductsWithParams(@Query() query) {
+    const {
+      brand,
+      minPrice,
+      maxPrice,
+      minRating,
+      minFeedbacks,
+      skip,
+      take,
+    } = query;
+
+    return this.ParserLogicService.getAllProductsWithParams({
+      brand,
+      minPrice: minPrice ? Number(minPrice) : undefined,
+      maxPrice: maxPrice ? Number(maxPrice) : undefined,
+      minRating: minRating ? Number(minRating) : undefined,
+      minFeedbacks: minFeedbacks ? Number(minFeedbacks) : undefined,
+      skip: skip ? Number(skip) : 0,
+      take: take ? Number(take) : 20,
+    });
+  }
+
   @Get('products/count')
   async getProductsCount() {
     return this.ParserLogicService.getProductsCount();

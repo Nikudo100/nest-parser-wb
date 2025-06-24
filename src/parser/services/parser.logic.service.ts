@@ -12,16 +12,16 @@ export class ParserLogicService {
   constructor(
     private readonly fetchService: ParserFetchService,
     private readonly dbService: ParserDatabaseService,
-  ) {}
+  ) { }
 
   async getProductByNmId(nmId: number): Promise<void> {
     this.logger.log('Запуск getProductByNmId');
-        try {
-          const product = await this.fetchService.fetchProduct(Number(nmId));
-          this.logger.log(await this.dbService.saveProductToDB(product));
-      } catch (err) {
-        this.logger.warn(`Ошибка при обработке NMID=${nmId}: ${err.message}`);
-      }
+    try {
+      const product = await this.fetchService.fetchProduct(Number(nmId));
+      this.logger.log(await this.dbService.saveProductToDB(product));
+    } catch (err) {
+      this.logger.warn(`Ошибка при обработке NMID=${nmId}: ${err.message}`);
+    }
   }
 
   async runSimilarProducts(): Promise<void> {
@@ -29,8 +29,8 @@ export class ParserLogicService {
     const products = await this.getAllProductsNmids();
     for (const nmId of products) {
       try {
-          const product = await this.fetchService.fetchProduct(Number(nmId))
-          await this.dbService.saveProductToDB(product)
+        const product = await this.fetchService.fetchProduct(Number(nmId))
+        await this.dbService.saveProductToDB(product)
       } catch (err) {
         this.logger.warn(`Ошибка при обработке NMID=${nmId}: ${err.message}`)
       }
@@ -57,19 +57,18 @@ export class ParserLogicService {
   async fetchProductCardJson(nmId: number): Promise<any> {
     const existingUrl = await this.dbService.findCartUrl(nmId);
     if (existingUrl) {
-        try {
-            // const data = await this.fetchService.fetchJson(existingUrl.url);
-            await this.dbService.updateProductImage(nmId, existingUrl.url);
-            // return data;
-        } catch (error) {
-            this.logger.warn(`Failed to fetch from cached URL for nmId=${nmId}: ${error.message}`);
-        }
+      try {
+        // const data = await this.fetchService.fetchJson(existingUrl.url);
+        await this.dbService.updateProductImage(nmId, existingUrl.url);
+        // return data;
+      } catch (error) {
+        this.logger.warn(`Failed to fetch from cached URL for nmId=${nmId}: ${error.message}`);
+      }
     }
-     else {
+    else {
       const res = await this.fetchService.fetchCard(nmId);
 
-      if (!res)
-      {
+      if (!res) {
         throw new Error(`Failed to fetch card data for nmId=${nmId}`);
       }
       const data = res.data;
@@ -110,7 +109,7 @@ export class ParserLogicService {
     }
 
     if (allProducts.length > 0) {
-        await this.dbService.saveManyProductsToDB(allProducts);
+      await this.dbService.saveManyProductsToDB(allProducts);
     }
   }
 
@@ -121,6 +120,9 @@ export class ParserLogicService {
   async getAllProductsNmids() {
     const products = await this.getAllProducts();
     return products.map(product => product.nmId);
+  }
+  async getAllProductsWithParams(params) {
+    return await this.dbService.getAllProductsWithParams(params);
   }
 
   deleteAllProducts() {
