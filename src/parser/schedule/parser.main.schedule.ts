@@ -1,23 +1,39 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
+import { ParserLogicService } from '../services/parser.logic.service';
 
 @Injectable()
 export class ParserMainSchedule {
   private readonly logger = new Logger(ParserMainSchedule.name);
 
-  @Cron(CronExpression.EVERY_10_SECONDS)
-  handleCron(callback?: () => void) {
-    this.logger.debug('Запуск задачи каждые 10 секунд');
-    if (callback) {
-      callback();
+  constructor(private readonly parserLogicService: ParserLogicService) { }
+
+  @Cron('0 0 12 * * *', { timeZone: 'Europe/Moscow' })
+  async handleCron() {
+    this.logger.debug('⏰ [12:00] Запуск runSimilarProducts()');
+    try {
+      await this.parserLogicService.runSimilarProducts();
+      this.logger.debug('✅ runSimilarProducts() выполнен успешно');
+    } catch (error) {
+      this.logger.error('❌ Ошибка при выполнении runSimilarProducts()', error);
     }
   }
 
-  // Method to set a custom callback
-  setScheduledTask(task: () => void) {
-    this.handleCron = () => {
-      this.logger.debug('Запуск задачи каждые 10 секунд');
-      task();
-    };
+  @Cron('0 0 9 * * *', { timeZone: 'Europe/Moscow' })
+  async handleCron2() {
+    this.logger.debug('⏰ [12:00] Запуск runCardJson()');
+    try {
+      await this.parserLogicService.runCardJson();
+      this.logger.debug('✅ runCardJson() выполнен успешно');
+    } catch (error) {
+      this.logger.error('❌ Ошибка при выполнении runCardJson()', error);
+    }
   }
+
+  // Каждые 10 секунд логгер
+  @Cron('*/60 * * * * *')
+  handleDebugCron() {
+    this.logger.debug('🕒 Scheduler is working (60  s interval)');
+  }
+
 }

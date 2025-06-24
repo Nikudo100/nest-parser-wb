@@ -8,11 +8,36 @@ export class ParserFetchService {
 
     async fetchJson(url: string) {
         try {
+            // Build proxy config if environment variables are set
+            const proxyConfig = process.env.PROXY_IP && process.env.PROXY_PORT &&
+                process.env.PROXY_LOGIN && process.env.PROXY_PASSWORD ? {
+                host: process.env.PROXY_IP,
+                port: parseInt(process.env.PROXY_PORT || '0'),
+                auth: {
+                    username: process.env.PROXY_LOGIN,
+                    password: process.env.PROXY_PASSWORD
+                }
+            } : undefined;
+
+            // Log proxy configuration for debugging
+            this.logger.debug(`Using proxy configuration: ${JSON.stringify(proxyConfig)}`);
+
+            // Make request to check IP before main request
+            const ipCheckResponse = await axios.get('https://api.ipify.org?format=json', {
+                headers: { 'User-Agent': 'Mozilla/5.0' },
+                ...(proxyConfig && { proxy: proxyConfig })
+            });
+            this.logger.log(`Current IP address: ${ipCheckResponse.data.ip}`);
+
+            // Make the actual request
             const response = await axios.get(url, {
                 headers: { 'User-Agent': 'Mozilla/5.0' },
+                ...(proxyConfig && { proxy: proxyConfig })
             });
+
             return response.data;
         } catch (error) {
+            this.logger.error(`Failed to fetch data: ${error.message}`);
             throw new Error(`Error fetching JSON: ${error.message}`);
         }
     }
@@ -51,7 +76,7 @@ export class ParserFetchService {
                 }
                 const filtered = products.filter(
                     p => (p.supplierRating ?? 0) > 4 && (p.feedbacks ?? 0) > 300
-                  );
+                );
 
                 allProducts.push(...filtered);
 
@@ -64,7 +89,7 @@ export class ParserFetchService {
         return allProducts;
     }
 
-    async fetchCard(nmId: number){
+    async fetchCard(nmId: number) {
         const vol = Math.floor(nmId / 100000);
         const part = Math.floor(nmId / 1000);
 
@@ -76,7 +101,7 @@ export class ParserFetchService {
                 const data = await this.fetchJson(url);
                 this.logger.log(`Successfully fetched data from URL: ${url}`);
 
-                return {data, url};
+                return { data, url };
             } catch (error) {
                 if (!error.message.includes('404')) {
                     this.logger.error(`Error fetching from URL: ${url}. Error: ${error.message}`);
