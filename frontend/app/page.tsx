@@ -36,17 +36,17 @@ export default function Home() {
   useEffect(() => {
     async function fetchCount() {
       try {
-        const res = await fetch('http://localhost:3004/parser/count');
+        const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_HOST}/parser/count`);
         const json = await res.json();
         setCount(json.count);
       } catch (err) {
         console.error('Error fetching count:', err);
       }
     }
-    
+
     async function fetchProducts() {
       try {
-        const res = await fetch('http://localhost:3004/parser/products');
+        const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_HOST}/parser/products`);
         const json = await res.json();
         setProducts(json);
       } catch (err) {
@@ -84,12 +84,12 @@ export default function Home() {
                 <p>Feedbacks: {product.feedbacks}</p>
                 <p>Всего на слакде: {product.totalQuantity}</p>
                 <img
-                    src={product.image}
-                    alt={product.name}
-                    width={200}
-                    height={200}
-                    style={{ objectFit: 'contain' }}
-                  />
+                  src={product.image}
+                  alt={product.name}
+                  width={200}
+                  height={200}
+                  style={{ objectFit: 'contain' }}
+                />
                 <div>
                   {/* <p>Colors:</p>
                   <ul>
