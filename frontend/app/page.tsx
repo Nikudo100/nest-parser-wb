@@ -26,6 +26,22 @@ export default function Home() {
     minFeedbacks: '',
   });
 
+  const handleSoftDelete = async (id: number) => {
+    if (!confirm('Удалить этот товар?')) return;
+
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_HOST}/parser/product/softDelete/${id}`);
+      if (res.ok) {
+        // Обновить список продуктов
+        setProducts(prev => prev.filter(p => p.id !== id));
+      } else {
+        console.error('Ошибка при удалении:', await res.text());
+      }
+    } catch (err) {
+      console.error('Ошибка при удалении:', err);
+    }
+  };
+
   useEffect(() => {
     const query = new URLSearchParams({
       brand: filters.brand,
@@ -120,6 +136,14 @@ export default function Home() {
                 <td className="p-2 border text-center">{product.price} ₽</td>
                 <td className="p-2 border text-center">{product.rating}</td>
                 <td className="p-2 border text-center">{product.feedbacks}</td>
+                <td className="p-2 border text-center">
+                  <button
+                    className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+                    onClick={() => handleSoftDelete(product.id)}
+                  >
+                    Удалить
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>

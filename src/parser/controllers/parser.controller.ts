@@ -72,6 +72,12 @@ export class ParserController {
   async dropAll() {
     return this.ParserLogicService.deleteAllProducts();
   }
+
+  @Get('product/softDelete/:id')
+  async softDeleteProduct(@Param('id', ParseIntPipe) id: number) {
+    return this.ParserLogicService.softDeleteProduct(id);
+  }
+
   @Get('test')
   async test() {
     return this.ParserLogicService.test();

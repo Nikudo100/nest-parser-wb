@@ -55,6 +55,8 @@ export class ParserDatabaseService {
         is_our_product: isOurProduct,
         image,
         price,
+        isDeleted: false,
+        parsedAt: new Date(),
       };
 
       const result = await this.prisma.product.upsert({
@@ -245,6 +247,7 @@ export class ParserDatabaseService {
         image: string | null;
         price: number | null;
         parsedAt: Date;
+        isDeleted: false;
       }> = [];
 
       for (const product of products) {
@@ -274,6 +277,7 @@ export class ParserDatabaseService {
           is_our_product: isOurProduct,
           image,
           price,
+          isDeleted: false,
           parsedAt: new Date(),
         });
       }
@@ -388,9 +392,7 @@ export class ParserDatabaseService {
     try {
       const products = await this.prisma.product.findMany({
         where: {
-          price: {
-            gte: 300 // Filter products with price >= 300
-          }
+          isDeleted: false
         },
         orderBy: [
           {
@@ -435,6 +437,7 @@ export class ParserDatabaseService {
             gte: minPrice,
             ...(maxPrice ? { lte: maxPrice } : {}),
           },
+          isDeleted: false,
           rating: { gte: minRating },
           feedbacks: { gte: minFeedbacks },
           ...(brand ? { brand } : {}),
@@ -482,4 +485,33 @@ export class ParserDatabaseService {
       throw error;
     }
   }
+
+  public async softDeleteProduct(nmId: number): Promise<void> {
+    try {
+      await this.prisma.product.update({
+        where: { nmId },
+        data: { isDeleted: true },
+      });
+      this.logger.log(`Product ${nmId} marked as deleted.`);
+    } catch (error) {
+      this.logger.error(`Failed to soft delete product: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+
+  //   Также — после сохранения можно помечать продукты, которых не было в списке как удалённые. Например:
+  // ts
+  // Копировать
+  // Редактировать
+  // const importedNmIds = productBaseData.map(p => p.nmId);
+  // await this.prisma.product.updateMany({
+  //   where: {
+  //     nmId: { notIn: importedNmIds },
+  //     isDeleted: false,
+  //   },
+  //   data: { isDeleted: true },
+  // });
+
+
 }

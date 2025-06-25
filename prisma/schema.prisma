@@ -8,43 +8,40 @@ datasource db {
 }
 
 model Product {
-  id             Int      @id @default(autoincrement())
-  nmId           Int      @unique // WB id
-  imtId          Int?
-  name           String?
-  brand          String?
-  image          String?
-  supplier       String? // STIK.STORE
-  supplierId     Int?
-  supplierRating Float?
-  rating         Float?
-  reviewRating   Float?
-  feedbacks      Int?
-  price          Int?
-  totalQuantity  Int?
-  is_our_product Boolean  @default(false)
-  colors         Json?
-  parsedAt       DateTime @default(now())
-
+  id              Int                  @id @default(autoincrement())
+  nmId            Int                  @unique
+  test            String?
+  imtId           Int?
+  name            String?
+  brand           String?
+  image           String?
+  supplier        String?
+  supplierId      Int?
+  supplierRating  Float?
+  rating          Float?
+  reviewRating    Float?
+  feedbacks       Int?
+  price           Int?
+  totalQuantity   Int?
+  is_our_product  Boolean              @default(false)
+  colors          Json?
+  isDeleted       Boolean              @default(false)
+  parsedAt        DateTime             @default(now())
+  cartUrl         CartUrl?             @relation("ProductToCartUrl")
   stockHistory    DailyStockSnapshot[] @relation("ProductToStockHistory")
+  cart            ProductCart?         @relation("ProductToCart")
   warehouseStocks WarehouseStock[]     @relation("ProductToWarehouseStock")
-
-  //Обратная связь
-  cart    ProductCart? @relation("ProductToCart")
-  cartUrl CartUrl?     @relation("ProductToCartUrl")
 
   @@index([nmId])
 }
 
 model ProductCart {
-  nmId        Int     @unique
-  imtId       Int?
-  slug        String?
-  name        String?
-  vendorCode  String?
-  description String?
-
-  // Вложенные структуры в JSON
+  nmId           Int      @unique
+  imtId          Int?
+  slug           String?
+  name           String?
+  vendorCode     String?
+  description    String?
   options        Json?
   groupedOptions Json?
   certificate    Json?
@@ -52,44 +49,40 @@ model ProductCart {
   selling        Json?
   media          Json?
   data           Json?
-
-  // Простые поля
-  nmColorsNames String?
-  contents      String?
-  hasRich       Boolean?
-  parsedAt      DateTime @default(now())
-
-  // связь с Product я подумал, что связь по nmId будет быстрее
-  product Product? @relation("ProductToCart", fields: [nmId], references: [nmId], onDelete: Cascade)
+  nmColorsNames  String?
+  contents       String?
+  hasRich        Boolean?
+  parsedAt       DateTime @default(now())
+  product        Product  @relation("ProductToCart", fields: [nmId], references: [nmId], onDelete: Cascade)
 
   @@index([nmId])
 }
 
 model DailyStockSnapshot {
   id         Int      @id @default(autoincrement())
-  date       DateTime @db.Date // Stores only date without time
+  date       DateTime @db.Date
   totalStock Int
-  product    Product  @relation("ProductToStockHistory", fields: [productId], references: [id], onDelete: Cascade)
   productId  Int
+  product    Product  @relation("ProductToStockHistory", fields: [productId], references: [id], onDelete: Cascade)
 
-  @@unique([productId, date]) // Чтобы не было дубликатов по дате
+  @@unique([productId, date])
 }
 
 model WarehouseStock {
   id        Int      @id @default(autoincrement())
-  wh        Int // ID склада
+  wh        Int
   dtype     Int?
   dist      Int?
   qty       Int
   priority  Int?
   time1     Int?
   time2     Int?
-  sizeName  String? // sizes[].name
-  sizeRank  Int? // sizes[].rank
-  optionId  Int? // sizes[].optionId
-  product   Product  @relation("ProductToWarehouseStock", fields: [productId], references: [id], onDelete: Cascade)
+  sizeName  String?
+  sizeRank  Int?
+  optionId  Int?
   productId Int
-  createdAt DateTime @default(now()) @db.Date // Stores only date without time
+  createdAt DateTime @default(now()) @db.Date
+  product   Product  @relation("ProductToWarehouseStock", fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId])
 }
@@ -97,8 +90,8 @@ model WarehouseStock {
 model CartUrl {
   url       String
   nmId      Int      @unique
-  product   Product? @relation("ProductToCartUrl", fields: [nmId], references: [nmId], onDelete: Cascade)
   createdAt DateTime @default(now())
+  product   Product  @relation("ProductToCartUrl", fields: [nmId], references: [nmId], onDelete: Cascade)
 
   @@index([nmId])
 }

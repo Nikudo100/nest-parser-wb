@@ -136,6 +136,9 @@ export class ParserLogicService {
     return this.dbService.getCartUrlCount();
   }
 
+  softDeleteProduct(nmId: number) {
+    return this.dbService.softDeleteProduct(nmId);
+  }
 
   test() {
     return 'test 123 1';
