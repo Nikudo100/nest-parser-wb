@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
 import { ParserLogicService } from '../services/parser.logic.service';
 
 @Controller('parser')
@@ -37,9 +37,21 @@ export class ParserController {
     return this.ParserLogicService.getAllProducts();
   }
 
-  @Get('products')
-  async getAllProductsWithParams(@Query() query) {
+  @Post('products')
+  async getAllProductsWithParams(@Body() body: {
+    isOur?: boolean;
+    nmId?: string;
+    brand?: string;
+    minPrice?: string | number;
+    maxPrice?: string | number;
+    minRating?: string | number;
+    minFeedbacks?: string | number;
+    skip?: string | number;
+    take?: string | number;
+  }) {
     const {
+      isOur,
+      nmId,
       brand,
       minPrice,
       maxPrice,
@@ -47,9 +59,11 @@ export class ParserController {
       minFeedbacks,
       skip,
       take,
-    } = query;
+    } = body;
 
     return this.ParserLogicService.getAllProductsWithParams({
+      isOur,
+      nmId,
       brand,
       minPrice: minPrice ? Number(minPrice) : undefined,
       maxPrice: maxPrice ? Number(maxPrice) : undefined,
@@ -64,10 +78,12 @@ export class ParserController {
   async getProductsCount() {
     return this.ParserLogicService.getProductsCount();
   }
+
   @Get('cartUrls/count')
   async getCartUrlCount() {
     return this.ParserLogicService.getCartUrlCount();
   }
+
   @Get('dropAll')
   async dropAll() {
     return this.ParserLogicService.deleteAllProducts();

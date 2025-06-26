@@ -412,6 +412,8 @@ export class ParserDatabaseService {
   }
 
   public async getAllProductsWithParams(params: {
+    isOur: boolean;
+    nmId?: number;
     brand?: string;
     minPrice?: number;
     maxPrice?: number;
@@ -421,6 +423,8 @@ export class ParserDatabaseService {
     take?: number;
   }) {
     const {
+      isOur,
+      nmId,
       brand,
       minPrice = 0,
       maxPrice,
@@ -433,6 +437,8 @@ export class ParserDatabaseService {
     try {
       const products = await this.prisma.product.findMany({
         where: {
+          ...(nmId ? { nmId: Number(nmId) } : {}),
+          ...(isOur ? { is_our_product: Boolean(isOur) } : {}),
           price: {
             gte: minPrice,
             ...(maxPrice ? { lte: maxPrice } : {}),
@@ -440,7 +446,7 @@ export class ParserDatabaseService {
           isDeleted: false,
           rating: { gte: minRating },
           feedbacks: { gte: minFeedbacks },
-          ...(brand ? { brand } : {}),
+          ...(brand ? { brand: { contains: brand, mode: 'insensitive' } } : {}),
         },
         orderBy: [
           { rating: 'desc' },
@@ -455,7 +461,7 @@ export class ParserDatabaseService {
           price: { gte: minPrice, ...(maxPrice ? { lte: maxPrice } : {}) },
           rating: { gte: minRating },
           feedbacks: { gte: minFeedbacks },
-          ...(brand ? { brand } : {}),
+          ...(brand ? { brand: { contains: brand, mode: 'insensitive' } } : {}),
         },
       });
 
@@ -465,7 +471,6 @@ export class ParserDatabaseService {
       throw error;
     }
   }
-
 
   public async updateProductImage(nmId: number, url: string): Promise<void> {
     try {
