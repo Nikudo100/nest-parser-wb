@@ -8,29 +8,33 @@ datasource db {
 }
 
 model Product {
-  id              Int                  @id @default(autoincrement())
-  nmId            Int                  @unique
-  test            String?
-  imtId           Int?
-  name            String?
-  brand           String?
-  image           String?
-  supplier        String?
-  supplierId      Int?
-  supplierRating  Float?
-  rating          Float?
-  reviewRating    Float?
-  feedbacks       Int?
-  price           Int?
-  totalQuantity   Int?
-  is_our_product  Boolean              @default(false)
-  colors          Json?
-  isDeleted       Boolean              @default(false)
-  parsedAt        DateTime             @default(now())
-  cartUrl         CartUrl?             @relation("ProductToCartUrl")
+  id             Int      @id @default(autoincrement())
+  nmId           Int      @unique
+  test           String?
+  imtId          Int?
+  name           String?
+  brand          String?
+  image          String?
+  supplier       String?
+  supplierId     Int?
+  supplierRating Float?
+  rating         Float?
+  reviewRating   Float?
+  feedbacks      Int?
+  price          Int?
+  totalQuantity  Int?
+  is_our_product Boolean  @default(false)
+  colors         Json?
+  isDeleted      Boolean  @default(false)
+  parsedAt       DateTime @default(now())
+  cartUrl        CartUrl? @relation("ProductToCartUrl")
+
   stockHistory    DailyStockSnapshot[] @relation("ProductToStockHistory")
   cart            ProductCart?         @relation("ProductToCart")
   warehouseStocks WarehouseStock[]     @relation("ProductToWarehouseStock")
+
+  ProductCompetitorAsOur        ProductCompetitor[] @relation("OurProduct")
+  ProductCompetitorAsCompetitor ProductCompetitor[] @relation("CompetitorProduct")
 
   @@index([nmId])
 }
@@ -94,4 +98,15 @@ model CartUrl {
   product   Product  @relation("ProductToCartUrl", fields: [nmId], references: [nmId], onDelete: Cascade)
 
   @@index([nmId])
+}
+
+model ProductCompetitor {
+  id           Int @id @default(autoincrement())
+  ourProductId Int // ID нашего товара
+  competitorId Int // ID товара конкурента (из той же таблицы Product)
+
+  ourProduct Product @relation("OurProduct", fields: [ourProductId], references: [id])
+  competitor Product @relation("CompetitorProduct", fields: [competitorId], references: [id])
+
+  @@unique([ourProductId, competitorId])
 }

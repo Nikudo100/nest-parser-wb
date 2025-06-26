@@ -514,4 +514,61 @@ export class ParserDatabaseService {
   // });
 
 
+
+
+  async linkCompetitor(ourId: number, competitorIds: number[]) {
+    // Check if product is ours
+    const ourProduct = await this.prisma.product.findUnique({
+      where: { id: ourId },
+    });
+
+    if (!ourProduct || !ourProduct.is_our_product) {
+      throw new Error('Product with ourId is not found or is not our product.');
+    }
+
+    // Check if competitors exist and are not our products
+    const competitors = await this.prisma.product.findMany({
+      where: {
+        id: { in: competitorIds },
+      },
+    });
+
+    if (competitors.length !== competitorIds.length) {
+      throw new Error('Some competitor products were not found.');
+    }
+
+    if (competitors.some(c => c.is_our_product)) {
+      throw new Error('Some competitors are marked as our products.');
+    }
+
+    // Check for existing links
+    const existingLinks = await this.prisma.productCompetitor.findMany({
+      where: {
+        ourProductId: ourId,
+        competitorId: { in: competitorIds },
+      },
+    });
+
+    if (existingLinks.length > 0) {
+      throw new Error('Some competitors are already linked to the product.');
+    }
+
+    // Create links for all competitors
+    return this.prisma.productCompetitor.createMany({
+      data: competitorIds.map(competitorId => ({
+        ourProductId: ourId,
+        competitorId,
+      })),
+    });
+  }
+
+  async getCompetitors(ourId) {
+    const competitors = await this.prisma.productCompetitor.findMany({
+      where: { ourProductId: ourId },
+      include: {
+        competitor: true,
+      },
+    });
+  }
+
 }

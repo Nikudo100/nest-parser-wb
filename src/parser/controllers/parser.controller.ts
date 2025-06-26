@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseIntPipe, Query } from '@nestjs/common';
+import { Controller, Get, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
 import { ParserLogicService } from '../services/parser.logic.service';
 
 @Controller('parser')
@@ -81,5 +81,32 @@ export class ParserController {
   @Get('test')
   async test() {
     return this.ParserLogicService.test();
+  }
+
+
+  @Post('product/:ourId/add-competitors')
+  async addCompetitors(
+    @Param('ourId', ParseIntPipe) ourId: number,
+    @Query('competitorIds') competitorIdsString: string) {
+    const competitorIds = competitorIdsString.split(',').map(id => parseInt(id));
+    return this.ParserLogicService.linkCompetitor(ourId, competitorIds);
+  }
+
+  // @Post('product/:ourId/add-competitors')
+  // async addCompetitors(
+  //   @Param('ourId', ParseIntPipe) ourId: number,
+  //   @Query('competitorIds') competitorIdsString: string,
+  // ) {
+  //   const competitorIds = competitorIdsString
+  //     .split(',')
+  //     .map(id => parseInt(id.trim()))
+  //     .filter(id => !isNaN(id));
+
+  //   return this.ParserLogicService.linkCompetitor(ourId, competitorIds);
+  // }
+
+  @Get('product/:ourId/competitors')
+  async getCompetitors(@Param('ourId', ParseIntPipe) ourId: number) {
+    return this.ParserLogicService.getCompetitors(ourId);
   }
 }

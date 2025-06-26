@@ -140,6 +140,14 @@ export class ParserLogicService {
     return this.dbService.softDeleteProduct(nmId);
   }
 
+  linkCompetitor(ourId, competitorId) {
+    return this.dbService.linkCompetitor(ourId, competitorId);
+  }
+
+  async getCompetitors(ourId) {
+    return this.dbService.getCompetitors(ourId);
+  }
+
   test() {
     return 'test 123 1';
   }
