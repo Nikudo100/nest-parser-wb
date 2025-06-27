@@ -521,57 +521,99 @@ export class ParserDatabaseService {
 
 
 
-  async linkCompetitor(ourId: number, competitorIds: number[]) {
-    // Check if product is ours
+  async linkCompetitorByNmId(ourNmId: number, competitorNmIds: number[]) {
+    // 1. Найти наш товар по nmId
     const ourProduct = await this.prisma.product.findUnique({
-      where: { id: ourId },
+      where: { nmId: ourNmId },
     });
-
+  
     if (!ourProduct || !ourProduct.is_our_product) {
-      throw new Error('Product with ourId is not found or is not our product.');
+      throw new Error('Our product not found or not marked as ours.');
     }
-
-    // Check if competitors exist and are not our products
+  
+    // 2. Найти товары-конкуренты по nmId
     const competitors = await this.prisma.product.findMany({
       where: {
-        id: { in: competitorIds },
+        nmId: { in: competitorNmIds },
       },
     });
-
-    if (competitors.length !== competitorIds.length) {
-      throw new Error('Some competitor products were not found.');
+  
+    if (competitors.length !== competitorNmIds.length) {
+      throw new Error('Some competitors not found.');
     }
-
+  
     if (competitors.some(c => c.is_our_product)) {
       throw new Error('Some competitors are marked as our products.');
     }
-
-    // Check for existing links
+  
+    // 3. Проверка на существующие связи
     const existingLinks = await this.prisma.productCompetitor.findMany({
       where: {
-        ourProductId: ourId,
-        competitorId: { in: competitorIds },
+        ourProductId: ourProduct.id,
+        competitorId: { in: competitors.map(c => c.id) },
       },
     });
-
+  
     if (existingLinks.length > 0) {
-      throw new Error('Some competitors are already linked to the product.');
+      throw new Error('Some competitors are already linked to this product.');
     }
-
-    // Create links for all competitors
+  
+    // 4. Создать связи
     return this.prisma.productCompetitor.createMany({
-      data: competitorIds.map(competitorId => ({
-        ourProductId: ourId,
-        competitorId,
+      data: competitors.map(c => ({
+        ourProductId: ourProduct.id,
+        competitorId: c.id,
       })),
     });
   }
-
-  async getCompetitors(ourId) {
+  async getCompetitors(ourId: number) {
     const competitors = await this.prisma.productCompetitor.findMany({
       where: { ourProductId: ourId },
       include: {
         competitor: true,
+        ourProduct: true,
+      },
+    });
+  
+    if (competitors.length === 0) {
+      return null;
+    }
+  
+    const ourProduct = competitors[0].ourProduct;
+    const competitorList = competitors.map(c => c.competitor);
+  
+    return {
+      ourProduct,
+      competitors: competitorList,
+    };
+  }
+
+  async unlinkCompetitorsByNmId(ourNmId: number, competitorNmIds: number[]) {
+    // Найдём наш товар по nmId
+    const ourProduct = await this.prisma.product.findUnique({
+      where: { nmId: ourNmId },
+    });
+  
+    if (!ourProduct || !ourProduct.is_our_product) {
+      throw new Error('Наш товар не найден или не помечен как наш.');
+    }
+  
+    // Найдём конкурентов по nmId
+    const competitors = await this.prisma.product.findMany({
+      where: { nmId: { in: competitorNmIds } },
+    });
+  
+    if (competitors.length !== competitorNmIds.length) {
+      throw new Error('Некоторые товары-конкуренты не найдены.');
+    }
+  
+    const competitorIds = competitors.map(c => c.id);
+  
+    // Удалим связи
+    return this.prisma.productCompetitor.deleteMany({
+      where: {
+        ourProductId: ourProduct.id,
+        competitorId: { in: competitorIds },
       },
     });
   }

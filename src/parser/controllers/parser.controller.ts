@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
 import { ParserLogicService } from '../services/parser.logic.service';
 
 @Controller('parser')
@@ -98,15 +98,13 @@ export class ParserController {
   async test() {
     return this.ParserLogicService.test();
   }
-
-
-  @Post('product/:ourId/add-competitors')
-  async addCompetitors(
-    @Param('ourId', ParseIntPipe) ourId: number,
-    @Query('competitorIds') competitorIdsString: string) {
-    const competitorIds = competitorIdsString.split(',').map(id => parseInt(id));
-    return this.ParserLogicService.linkCompetitor(ourId, competitorIds);
+  @Get('testProxy')
+  async testProxy() {
+    return this.ParserLogicService.testProxy();
   }
+
+
+
 
   // @Post('product/:ourId/add-competitors')
   // async addCompetitors(
@@ -121,8 +119,25 @@ export class ParserController {
   //   return this.ParserLogicService.linkCompetitor(ourId, competitorIds);
   // }
 
+
+  @Post('product/:ourNmId/add-competitors-by-nmId')
+  async addCompetitorsByNmId(
+    @Param('ourNmId', ParseIntPipe) ourNmId: number,
+    @Body() body: { competitorNmIds: number[] }
+  ) {
+    return this.ParserLogicService.linkCompetitorByNmId(ourNmId, body.competitorNmIds);
+  }
+
   @Get('product/:ourId/competitors')
   async getCompetitors(@Param('ourId', ParseIntPipe) ourId: number) {
     return this.ParserLogicService.getCompetitors(ourId);
+  }
+
+  @Delete('product/:ourNmId/remove-competitors')
+  async removeCompetitors(
+    @Param('ourNmId', ParseIntPipe) ourNmId: number,
+    @Body() body: { competitorNmIds: number[] },
+  ) {
+    return this.ParserLogicService.unlinkCompetitorsByNmId(ourNmId, body.competitorNmIds);
   }
 }

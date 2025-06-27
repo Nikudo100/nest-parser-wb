@@ -140,14 +140,20 @@ export class ParserLogicService {
     return this.dbService.softDeleteProduct(nmId);
   }
 
-  linkCompetitor(ourId, competitorId) {
-    return this.dbService.linkCompetitor(ourId, competitorId);
+  linkCompetitorByNmId(ourNmId, competitorNmIds) {
+    return this.dbService.linkCompetitorByNmId(ourNmId, competitorNmIds);
+  }
+  async unlinkCompetitorsByNmId(ourId, competitorNmIds) {
+    return this.dbService.unlinkCompetitorsByNmId(ourId, competitorNmIds);
   }
 
   async getCompetitors(ourId) {
     return this.dbService.getCompetitors(ourId);
   }
 
+  testProxy() {
+    return this.fetchService.testProxy();
+  }
   test() {
     return 'test 123 1';
   }

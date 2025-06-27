@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { WBProduct } from '../dto/WBProduct';
 import axios from 'axios';
+import * as tunnel from 'tunnel';
+import { SocksProxyAgent } from 'socks-proxy-agent';
 
 @Injectable()
 export class ParserFetchService {
@@ -8,39 +10,99 @@ export class ParserFetchService {
 
     async fetchJson(url: string) {
         try {
-            // Build proxy config if environment variables are set
-            const proxyConfig = process.env.PROXY_IP && process.env.PROXY_PORT &&
-                process.env.PROXY_LOGIN && process.env.PROXY_PASSWORD ? {
-                host: process.env.PROXY_IP,
-                port: parseInt(process.env.PROXY_PORT || '0'),
-                auth: {
-                    username: process.env.PROXY_LOGIN,
-                    password: process.env.PROXY_PASSWORD
+          const {
+            PROXY_IP,
+            PROXY_PORT,
+            PROXY_LOGIN,
+            PROXY_PASSWORD
+          } = process.env;
+
+          const useProxy = PROXY_IP && PROXY_PORT && PROXY_LOGIN && PROXY_PASSWORD;
+          let agent : any = undefined;
+
+
+          if (useProxy) {
+            const proxyUrl = `socks5h://${PROXY_LOGIN}:${PROXY_PASSWORD}@${PROXY_IP}:${PROXY_PORT}`;
+                agent = new SocksProxyAgent(proxyUrl);
+
+            // this.logger.debug(`Using SOCKS5 proxy: ${PROXY_IP}:${PROXY_PORT} with auth`);
+          }
+
+        //   // Проверка IP перед основным запросом
+        //   const ipCheckResponse = await axios.get('https://api.ipify.org?format=json', {
+        //     httpAgent: agent,
+        //     httpsAgent: agent,
+        //     headers: { 'User-Agent': 'Mozilla/5.0' },
+        //     timeout: 10000,
+        //   });
+
+        //   this.logger.log(`Current IP via proxy: ${ipCheckResponse.data.ip}`);
+
+          // Повторяющийся запрос с retry
+          let retries = 0;
+          const maxRetries = 3;
+
+          while (retries < maxRetries) {
+            try {
+              const response = await axios.get(url, {
+                httpAgent: agent,
+                httpsAgent: agent,
+                headers: { 'User-Agent': 'Mozilla/5.0' },
+                timeout: 10000,
+              });
+
+              return response.data;
+            } catch (err) {
+              if (err.code === 'ECONNRESET' && retries < maxRetries - 1) {
+                retries++;
+                this.logger.warn(`Connection reset. Retrying... (${retries}/${maxRetries})`);
+                await new Promise(res => setTimeout(res, 1000 * retries));
+                continue;
+              }
+
+              if (axios.isAxiosError(err)) {
+                this.logger.error(`Axios error: ${err.message}`);
+                if (err.response) {
+                  this.logger.error(`Status: ${err.response.status}`);
+                  this.logger.error(`Response: ${JSON.stringify(err.response.data)}`);
                 }
-            } : undefined;
+              }
 
-            // Log proxy configuration for debugging
-            this.logger.debug(`Using proxy configuration: ${JSON.stringify(proxyConfig)}`);
-
-            // Make request to check IP before main request
-            const ipCheckResponse = await axios.get('https://api.ipify.org?format=json', {
-                headers: { 'User-Agent': 'Mozilla/5.0' },
-                ...(proxyConfig && { proxy: proxyConfig })
-            });
-            this.logger.log(`Current IP address: ${ipCheckResponse.data.ip}`);
-
-            // Make the actual request
-            const response = await axios.get(url, {
-                headers: { 'User-Agent': 'Mozilla/5.0' },
-                ...(proxyConfig && { proxy: proxyConfig })
-            });
-
-            return response.data;
+              throw err;
+            }
+          }
         } catch (error) {
-            this.logger.error(`Failed to fetch data: ${error.message}`);
-            throw new Error(`Error fetching JSON: ${error.message}`);
+          this.logger.error(`Failed to fetch data: ${error.message}`);
+        //   throw new Error(`Error fetching JSON: ${error.message}`);
         }
-    }
+      }
+
+      async testProxy(): Promise<boolean> {
+        try {
+          const testUrls = [
+            'https://api.ipify.org?format=json',
+            'https://httpbin.org/ip',
+            'https://api.myip.com'
+          ];
+      
+          for (const url of testUrls) {
+            try {
+              const response = await this.fetchJson(url);
+              const ip = response.ip || response.origin || response.ipAddress;
+              this.logger.log(`Proxy test successful for ${url}. IP: ${ip}`);
+              return true;
+            } catch (error) {
+              this.logger.warn(`Failed to test proxy with ${url}: ${error.message}`);
+              continue;
+            }
+          }
+      
+          return false;
+        } catch (error) {
+          this.logger.error(`Proxy test failed: ${error.message}`);
+          return false;
+        }
+      }
 
     async fetchProduct(nmId: number): Promise<WBProduct> {
         const url = `https://card.wb.ru/cards/v2/detail?appType=1&curr=rub&dest=-1257786&spp=30&hide_dtype=13&ab_testing=true&lang=ru&nm=${nmId}`;
