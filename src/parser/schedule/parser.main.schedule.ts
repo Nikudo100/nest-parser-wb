@@ -8,7 +8,7 @@ export class ParserMainSchedule {
 
   constructor(private readonly parserLogicService: ParserLogicService) { }
 
-  @Cron('0 0 12 * * *', { timeZone: 'Europe/Moscow' })
+  @Cron('0 20 13 * * *', { timeZone: 'Europe/Moscow' })
   async handleCron() {
     this.logger.debug('⏰ [12:00] Запуск runSimilarProducts()');
     try {
@@ -18,8 +18,18 @@ export class ParserMainSchedule {
       this.logger.error('❌ Ошибка при выполнении runSimilarProducts()', error);
     }
   }
+  @Cron('0 22 13 * * *', { timeZone: 'Europe/Moscow' })
+  async handleCron1() {
+    this.logger.debug('⏰ [12:00] Запуск runSimilarProducts()');
+    try {
+      await this.parserLogicService.runSimilarProducts();
+      this.logger.debug('✅ runSimilarProducts() выполнен успешно');
+    } catch (error) {
+      this.logger.error('❌ Ошибка при выполнении runSimilarProducts()', error);
+    }
+  }
 
-  @Cron('0 0 9 * * *', { timeZone: 'Europe/Moscow' })
+  @Cron('0 21 13 * * *', { timeZone: 'Europe/Moscow' })
   async handleCron2() {
     this.logger.debug('⏰ [12:00] Запуск runCardJson()');
     try {
