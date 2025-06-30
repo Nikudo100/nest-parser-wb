@@ -194,6 +194,7 @@ export default function Home() {
                     // alt={product.name}
                     className="object-contain z-50 mx-auto w-40 h-40 bg-white rounded border transition-transform duration-200 transform hover:scale-250"
                   />
+                  <p>{ product.image + product.nmId}</p>
                 </td>
                 <td className="p-2 border">
                   <a 
