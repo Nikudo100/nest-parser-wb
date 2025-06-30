@@ -488,7 +488,7 @@ public async saveCartJson(nmId: number, rawData: any): Promise<void> {
           ...(brand ? { brand: { contains: brand, mode: 'insensitive' } } : {}),
         },
       });
-      
+
       const productsWithCart = products.map(product => ({
         ...product,
         cart: product.cart || null

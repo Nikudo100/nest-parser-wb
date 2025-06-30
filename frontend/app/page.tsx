@@ -103,6 +103,7 @@ export default function Home() {
       .then(res => res.json())
       .then(data => {
         setProducts(data.products);
+        console.log('DATA:', data);
         setTotal(data.total);
       })
       .catch(err => console.error('Fetch error:', err));
