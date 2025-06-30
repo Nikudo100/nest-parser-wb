@@ -499,7 +499,7 @@ public async saveCartJson(nmId: number, rawData: any): Promise<void> {
         ...product,
         cart: product.cart || null
       }));
-      console.log('DEBUG PRODUCTS', products[0]);
+      console.log('DEBUG PRODUCTS', products);
       return { products: productsWithCart, total };
     } catch (error) {
       this.logger.error(`Failed to get products: ${error.message}`, error.stack);
