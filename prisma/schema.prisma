@@ -39,6 +39,17 @@ model Product {
   @@index([nmId])
 }
 
+model ProductCompetitor {
+  id             Int @id @default(autoincrement())
+  ourProductNmId Int // NM ID нашего товара
+  competitorNmId Int // NM ID товара конкурента
+
+  ourProduct Product @relation("OurProduct", fields: [ourProductNmId], references: [nmId])
+  competitor Product @relation("CompetitorProduct", fields: [competitorNmId], references: [nmId])
+
+  @@unique([ourProductNmId, competitorNmId])
+}
+
 model ProductCart {
   nmId           Int      @unique
   imtId          Int?
@@ -98,15 +109,4 @@ model CartUrl {
   product   Product  @relation("ProductToCartUrl", fields: [nmId], references: [nmId], onDelete: Cascade)
 
   @@index([nmId])
-}
-
-model ProductCompetitor {
-  id           Int @id @default(autoincrement())
-  ourProductId Int // ID нашего товара
-  competitorId Int // ID товара конкурента (из той же таблицы Product)
-
-  ourProduct Product @relation("OurProduct", fields: [ourProductId], references: [id])
-  competitor Product @relation("CompetitorProduct", fields: [competitorId], references: [id])
-
-  @@unique([ourProductId, competitorId])
 }
