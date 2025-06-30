@@ -469,8 +469,17 @@ public async saveCartJson(nmId: number, rawData: any): Promise<void> {
           feedbacks: { gte: minFeedbacks },
           ...(brand ? { brand: { contains: brand, mode: 'insensitive' } } : {}),
         },
-        include: {
-          cart: true
+        select: {
+          id: true,
+          nmId: true,
+          name: true,
+          brand: true,
+          price: true,
+          rating: true,
+          feedbacks: true,
+          image: true,
+          is_our_product: true,
+          cart: true,
         },
         orderBy: [
           { rating: 'desc' },
