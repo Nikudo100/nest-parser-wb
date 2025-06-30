@@ -482,7 +482,13 @@ public async saveCartJson(nmId: number, rawData: any): Promise<void> {
 
       const total = await this.prisma.product.count({
         where: {
-          price: { gte: minPrice, ...(maxPrice ? { lte: maxPrice } : {}) },
+          ...(nmId ? { nmId: Number(nmId) } : {}),
+          ...(isOur ? { is_our_product: Boolean(isOur) } : {}),
+          price: {
+            gte: minPrice,
+            ...(maxPrice ? { lte: maxPrice } : {}),
+          },
+          isDeleted: false,
           rating: { gte: minRating },
           feedbacks: { gte: minFeedbacks },
           ...(brand ? { brand: { contains: brand, mode: 'insensitive' } } : {}),
@@ -493,7 +499,7 @@ public async saveCartJson(nmId: number, rawData: any): Promise<void> {
         ...product,
         cart: product.cart || null
       }));
-
+      console.log('DEBUG PRODUCTS', products[0]);
       return { products: productsWithCart, total };
     } catch (error) {
       this.logger.error(`Failed to get products: ${error.message}`, error.stack);
