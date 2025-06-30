@@ -469,6 +469,9 @@ public async saveCartJson(nmId: number, rawData: any): Promise<void> {
           feedbacks: { gte: minFeedbacks },
           ...(brand ? { brand: { contains: brand, mode: 'insensitive' } } : {}),
         },
+        include: {
+          cart: true
+        },
         orderBy: [
           { rating: 'desc' },
           { feedbacks: 'desc' },
@@ -485,8 +488,13 @@ public async saveCartJson(nmId: number, rawData: any): Promise<void> {
           ...(brand ? { brand: { contains: brand, mode: 'insensitive' } } : {}),
         },
       });
+      
+      const productsWithCart = products.map(product => ({
+        ...product,
+        cart: product.cart || null
+      }));
 
-      return { products, total };
+      return { products: productsWithCart, total };
     } catch (error) {
       this.logger.error(`Failed to get products: ${error.message}`, error.stack);
       throw error;

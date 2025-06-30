@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from 'react';
 
+interface Cart {
+  vendorCode: string;
+}
+
 interface Product {
   id: number;
   nmId: number;
@@ -12,6 +16,7 @@ interface Product {
   feedbacks: number;
   image: string;
   is_our_product: string;
+  cart?: Cart;
 }
 
 export default function Home() {
@@ -165,7 +170,7 @@ export default function Home() {
           <thead className="text-gray-700 bg-gray-100">
             <tr>
               <th className="p-3 border">Картинка</th>
-              <th className="p-3 border">nmId</th>
+              <th className="p-3 border">nmId / Артикул</th>
               <th className="p-3 border">Название</th>
               <th className="p-3 border">Бренд</th>
               <th className="p-3 text-center border">Цена</th>
@@ -196,6 +201,11 @@ export default function Home() {
                   >
                     {product.nmId}
                   </a>
+                  {product.cart?.vendorCode && (
+                    <div className="mt-1 text-sm text-gray-600">
+                      Артикул: {product.cart.vendorCode}
+                    </div>
+                  )}
                 </td>
                 <td className="p-2 border">{product.name}</td>
                 <td className="p-2 border">{product.brand}</td>
