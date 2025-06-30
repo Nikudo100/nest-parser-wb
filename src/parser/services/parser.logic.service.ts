@@ -43,9 +43,10 @@ export class ParserLogicService {
     const products = await this.getAllProductsNmids();
     for (const nmid of products) {
       try {
-        const cardData = await this.fetchProductCardJson(Number(nmid));
 
-        this.logger.log(`Получен card.json для NMID=${nmid}: ${cardData?.imt_name || 'без имени'}`);
+        await this.fetchProductCardJson(Number(nmid));
+
+        // this.logger.log(`Получен card.json для NMID=${nmid}: ${cardData?.imt_name || 'без имени'}`);
 
         // await this.dbService.saveCartJson(Number(nmid), cardData);
       } catch (err) {
@@ -58,9 +59,9 @@ export class ParserLogicService {
     const existingUrl = await this.dbService.findCartUrl(nmId);
     if (existingUrl) {
       try {
-        // const data = await this.fetchService.fetchJson(existingUrl.url);
-        await this.dbService.updateProductImage(nmId, existingUrl.url);
-        // return data;
+          await this.dbService.updateProductImage(nmId, existingUrl.url);
+          const data = await this.fetchService.fetchJson(existingUrl.url)
+          await this.dbService.saveCartJson(nmId, data);
       } catch (error) {
         this.logger.warn(`Failed to fetch from cached URL for nmId=${nmId}: ${error.message}`);
       }
@@ -72,26 +73,14 @@ export class ParserLogicService {
         throw new Error(`Failed to fetch card data for nmId=${nmId}`);
       }
       const data = res.data;
+
       await this.dbService.saveCartUrl(nmId, res.url);
       await this.dbService.updateProductImage(nmId, res.url);
+      await this.dbService.saveCartJson(nmId, data);
 
       return data;
     }
   }
-
-  // async getRecommendedForOurProducts() {
-  //   this.logger.log('Запуск получения card.json для всех товаров');
-  //   for (const nmid of allOurProductsNmidTEST) {
-  //     try {
-  //       const products = await this.fetchService.fetchRecommended(Number(nmid))
-  //       for (const product of products){
-  //         this.dbService.saveProductToDB(product)
-  //       }
-  //     } catch (err) {
-  //       this.logger.warn(`Не удалось получить card.json для NMID=${nmid}: ${err.message}`);
-  //     }
-  //   }
-  // }
 
   async getRecommendedForOurProducts() {
     this.logger.log('Recommended Products');
@@ -156,5 +145,8 @@ export class ParserLogicService {
   }
   test() {
     return 'test 123 1';
+  }
+  deleteOldCartUrls() {
+    return this.dbService.deleteOldCartUrls();
   }
 }

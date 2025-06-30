@@ -15,7 +15,9 @@ export class ParserController {
   // async runAlg1() {
   //   return this.ParserLogicService.runSimilarProducts();
   // }
-  @Get('alg2')
+
+
+  @Get('runSimilarProducts')
   async runAlg2() {
     return this.ParserLogicService.runSimilarProducts();
   }
@@ -102,6 +104,10 @@ export class ParserController {
   async testProxy() {
     return this.ParserLogicService.testProxy();
   }
+  @Get('deleteOldCartUrls')
+  async deleteOldCartUrls() {
+    return this.ParserLogicService.deleteOldCartUrls();
+  }
 
 
 
@@ -128,9 +134,9 @@ export class ParserController {
     return this.ParserLogicService.linkCompetitorByNmId(ourNmId, body.competitorNmIds);
   }
 
-  @Get('product/:ourId/competitors')
-  async getCompetitors(@Param('ourId', ParseIntPipe) ourId: number) {
-    return this.ParserLogicService.getCompetitors(ourId);
+  @Get('product/:ourNmId/competitors') 
+  async getCompetitors(@Param('ourNmId', ParseIntPipe) ourNmId: number) {
+    return this.ParserLogicService.getCompetitors(ourNmId);
   }
 
   @Delete('product/:ourNmId/remove-competitors')
@@ -140,4 +146,5 @@ export class ParserController {
   ) {
     return this.ParserLogicService.unlinkCompetitorsByNmId(ourNmId, body.competitorNmIds);
   }
+
 }

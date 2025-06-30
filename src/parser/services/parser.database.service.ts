@@ -155,13 +155,13 @@ export class ParserDatabaseService {
     }
   }
 
-  public async saveCartJson(nmId: number, rawData: any): Promise<void> {
+public async saveCartJson(nmId: number, rawData: any): Promise<void> {
+  try {
     const nmIdToNum = Number(nmId);
     const camelCaseData = convertKeysToCamelCase(rawData);
     const plainCard = instanceToPlain(camelCaseData);
-    const parsedAt = new Date();
 
-    // Проверим наличие Product с таким nmId
+    // Check if product exists
     const product = await this.prisma.product.findUnique({
       where: { nmId: nmIdToNum }
     });
@@ -170,19 +170,40 @@ export class ParserDatabaseService {
       throw new Error(`Product with nmId ${nmIdToNum} not found`);
     }
 
-    // Готовим данные для вставки
+    // Prepare data for upsert
     const processedCard = {
       nmId: nmIdToNum,
-      imtId: plainCard.imtId ? Number(plainCard.imtId) : undefined,
+      imtId: plainCard.imtId ? Number(plainCard.imtId) : null,
+      slug: plainCard.slug || null,
+      name: plainCard.imtName || null,
+      vendorCode: plainCard.vendorCode || null,
+      description: plainCard.description || null,
+      options: plainCard.options || null,
+      groupedOptions: plainCard.groupedOptions || null,
+      certificate: plainCard.certificate || null,
+      fullColors: plainCard.fullColors || null,
+      selling: plainCard.selling || null,
+      media: plainCard.media || null,
+      data: plainCard.data || null,
+      nmColorsNames: plainCard.nmColorsNames || null,
+      contents: plainCard.contents || null,
+      hasRich: plainCard.hasRich || null,
+      parsedAt: new Date()
     };
 
-    // upsert с корректным синтаксисом
+    // Upsert the product cart data
     await this.prisma.productCart.upsert({
       where: { nmId: nmIdToNum },
       create: processedCard,
       update: processedCard
     });
+
+    this.logger.debug(`Successfully saved cart JSON for nmId: ${nmIdToNum}`);
+  } catch (error) {
+    this.logger.error(`Failed to save cart JSON for nmId ${nmId}: ${error.message}`, error.stack);
+    throw error;
   }
+}
 
   public async saveCartUrl(nmId: number, url: string): Promise<void> {
     try {
@@ -505,23 +526,7 @@ export class ParserDatabaseService {
   }
 
 
-  //   Также — после сохранения можно помечать продукты, которых не было в списке как удалённые. Например:
-  // ts
-  // Копировать
-  // Редактировать
-  // const importedNmIds = productBaseData.map(p => p.nmId);
-  // await this.prisma.product.updateMany({
-  //   where: {
-  //     nmId: { notIn: importedNmIds },
-  //     isDeleted: false,
-  //   },
-  //   data: { isDeleted: true },
-  // });
-
-
-
-
-  async linkCompetitorByNmId(ourNmId: number, competitorNmIds: number[]) {
+async linkCompetitorByNmId(ourNmId: number, competitorNmIds: number[]) {
     // 1. Find our product by nmId
     const ourProduct = await this.prisma.product.findUnique({
       where: { nmId: ourNmId },
@@ -549,8 +554,8 @@ export class ParserDatabaseService {
     // 3. Check for existing links
     const existingLinks = await this.prisma.productCompetitor.findMany({
       where: {
-        ourProductNmId: ourNmId,
-        competitorNmId: { in: competitorNmIds },
+        ourProduct: { nmId: ourNmId },
+        competitor: { nmId: { in: competitorNmIds } },
       },
     });
 
@@ -558,18 +563,21 @@ export class ParserDatabaseService {
       throw new Error('Some competitors are already linked to this product.');
     }
 
-    // 4. Create links
+    const competitorLinks = competitorNmIds.map(competitorNmId => ({
+      ourProductNmId: ourProduct.nmId,
+      competitorNmId
+    }));
+    
     return this.prisma.productCompetitor.createMany({
-      data: competitorNmIds.map(competitorNmId => ({
-        ourProductNmId: ourNmId,
-        competitorNmId,
-      })),
+      data: competitorLinks
     });
   }
 
   async getCompetitors(ourNmId: number) {
     const competitors = await this.prisma.productCompetitor.findMany({
-      where: { ourProductNmId: ourNmId },
+      where: {
+        ourProduct: { nmId: ourNmId }
+      },
       include: {
         competitor: true,
         ourProduct: true,
@@ -602,10 +610,27 @@ export class ParserDatabaseService {
     // Delete links directly using nmIds
     return this.prisma.productCompetitor.deleteMany({
       where: {
-        ourProductNmId: ourNmId,
-        competitorNmId: { in: competitorNmIds },
+        ourProduct: { nmId: ourNmId },
+        competitor: { nmId: { in: competitorNmIds } }
       },
     });
   }
 
+
+async deleteOldCartUrls(): Promise<void> {
+  try {
+    const result = await this.prisma.cartUrl.deleteMany({
+      where: {
+        url: {
+          contains: 'https://basket-01.wbbasket.ru/'
+        }
+      }
+    });
+    
+    this.logger.log(`Successfully deleted ${result.count} old cart URLs`);
+  } catch (error) {
+    this.logger.error(`Failed to delete old cart URLs: ${error.message}`, error.stack);
+    throw error;
+  }
+}
 }

@@ -43,6 +43,7 @@ export class ParserMainSchedule {
   // Каждые 10 секунд логгер
   @Cron('*/60 * * * * *')
   handleDebugCron() {
+    // this.parserLogicService.deleteOldCartUrls();
     this.logger.debug('🕒 Scheduler is working (60  s interval)');
   }
 
