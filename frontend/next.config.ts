@@ -9,6 +9,12 @@ const nextConfig = {
         port: '',
         pathname: '**',
       },
+      {
+        protocol: 'https',
+        hostname: '**.wbbasket.ru', // разрешаем все поддомены wbbasket.ru
+        port: '',
+        pathname: '**',
+      },
     ],
   },
   allowedDevOrigins: [
