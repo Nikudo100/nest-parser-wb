@@ -181,6 +181,7 @@ export default function Home() {
             </tr>
           </thead>
           <tbody>
+            {/* 123 */}
             {products.map((product) => (
               <tr key={product.id} className="transition even:bg-gray-50 hover:bg-gray-100">
                 <td className="p-2 text-center border">
@@ -189,7 +190,8 @@ export default function Home() {
                     height={200}
                     style={{ objectFit: 'contain' }}
                     src={product.image || '/placeholder.png'}
-                    alt={product.name}
+                    alt={product.image}
+                    // alt={product.name}
                     className="object-contain z-50 mx-auto w-40 h-40 bg-white rounded border transition-transform duration-200 transform hover:scale-250"
                   />
                 </td>
