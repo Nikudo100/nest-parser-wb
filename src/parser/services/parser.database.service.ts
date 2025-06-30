@@ -37,7 +37,7 @@ export class ParserDatabaseService {
         ? Math.round(sizes[0].price.total / 100)
         : null;
 
-      const image = null;
+      // const image = null;
 
       const baseData = {
         nmId: id,
@@ -53,7 +53,7 @@ export class ParserDatabaseService {
         totalQuantity: product.totalQuantity,
         colors: product.colors,
         is_our_product: isOurProduct,
-        image,
+        // image,
         price,
         isDeleted: false,
         parsedAt: new Date(),
@@ -265,7 +265,7 @@ public async saveCartJson(nmId: number, rawData: any): Promise<void> {
         totalQuantity?: number;
         colors?: string;
         is_our_product: boolean;
-        image: string | null;
+        // image: string | null;
         price: number | null;
         parsedAt: Date;
         isDeleted: false;
@@ -296,7 +296,7 @@ public async saveCartJson(nmId: number, rawData: any): Promise<void> {
           totalQuantity: product.totalQuantity,
           colors: Array.isArray(product.colors) ? JSON.stringify(product.colors) : product.colors,
           is_our_product: isOurProduct,
-          image,
+          // image,
           price,
           isDeleted: false,
           parsedAt: new Date(),
